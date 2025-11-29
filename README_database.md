@@ -22,7 +22,6 @@
 | make_survey_history_id | INT / BIGINT | 主键，自增                       |
 | user_id                | INT / BIGINT | 外键 → User(user_id)，不能为空     |
 | survey_id              | INT / BIGINT | 外键 → Survey(survey_id)，不能为空 |
-| survey_number          | VARCHAR(50)  | 可选，问卷编号或序号                  |
 | created_at             | DATETIME     | 创建时间，默认当前时间                 |
 
 ---
@@ -36,7 +35,6 @@
 | answer_survey_history_id | INT / BIGINT | 主键，自增                       |
 | user_id                  | INT / BIGINT | 外键 → User(user_id)，不能为空     |
 | survey_id                | INT / BIGINT | 外键 → Survey(survey_id)，不能为空 |
-| survey_number            | VARCHAR(50)  | 可选，问卷编号                     |
 | answered_at              | DATETIME     | 填写时间，默认当前时间                 |
 
 ---
@@ -50,9 +48,6 @@
 | survey_id        | INT / BIGINT                      | 主键，自增                     |
 | release_time     | DATETIME                          | 发布时间                      |
 | survey_status    | ENUM('draft','released','closed') | 问卷状态                      |
-| question_number  | INT                               | 问题数量（可选，计算字段可通过 COUNT 查询） |
-| question_content | TEXT                              | 问题内容（如果每个问题单独表，则此字段可移除）   |
-| answer_number    | INT                               | 答案数量（可选）                  |
 | created_by       | INT / BIGINT                      | 外键 → User(user_id)，问卷创建者  |
 
 ---
@@ -61,13 +56,13 @@
 
 每个问卷包含多道题。
 
-| 字段名            | 类型                               | 约束 / 说明                |
-| -------------- | -------------------------------- | ---------------------- |
-| question_id    | INT / BIGINT                     | 主键，自增                  |
-| survey_id      | INT / BIGINT                     | 外键 → Survey(survey_id) |
-| question_index | INT                              | 问题序号                   |
-| question_text  | TEXT                             | 问题内容                   |
-| question_type  | ENUM('single','multiple','text') | 题型                     |
+| 字段名            | 类型                                              | 约束 / 说明                |
+| -------------- |-------------------------------------------------| ---------------------- |
+| question_id    | INT / BIGINT                                    | 主键，自增                  |
+| survey_id      | INT / BIGINT                                    | 外键 → Survey(survey_id) |
+| question_index | INT                                             | 问题序号                   |
+| question_text  | TEXT                                            | 问题内容                   |
+| question_type  | ENUM('single','multiple','text','must','select') | 题型                     |
 
 ---
 
