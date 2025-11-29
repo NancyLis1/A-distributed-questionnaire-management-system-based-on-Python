@@ -1,4 +1,3 @@
-# sqlite_gui_browser.py
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog

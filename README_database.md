@@ -2,27 +2,30 @@
 
 存储用户信息和历史记录引用。
 
-| 字段名        | 类型           | 约束 / 说明     |
-| ---------- | ------------ | ----------- |
-| user_id    | INT / BIGINT | 主键，自增       |
-| user_name  | VARCHAR(50)  | 唯一，不为空      |
-| created_at | DATETIME     | 注册时间，默认当前时间 |
-| last_login | DATETIME     | 可选，最后登录时间   |
-
-
+| 字段名         | 类型           | 约束 / 说明     |
+|-------------|--------------|-------------|
+| user_id     | INT / BIGINT | 主键，自增       |
+| user_name   | VARCHAR(50)  | 唯一，不为空      |
+| created_at  | DATETIME     | 注册时间，默认当前时间 |
+| last_login  | DATETIME     | 可选，最后登录时间   |
+| user_status | TEXT         | 用户状态(是否被封禁） |
+| unban_time  | DATETIME     | 解封时间        |
 
 ---
 
-## 2️⃣ 问卷创建历史（Make_survey_history）
+## 2️⃣ 答案表（Answer）
 
-记录用户创建过的问卷。
+存储用户回答的内容。
 
-| 字段名                    | 类型           | 约束 / 说明                     |
-| ---------------------- | ------------ | --------------------------- |
-| make_survey_history_id | INT / BIGINT | 主键，自增                       |
-| user_id                | INT / BIGINT | 外键 → User(user_id)，不能为空     |
-| survey_id              | INT / BIGINT | 外键 → Survey(survey_id)，不能为空 |
-| created_at             | DATETIME     | 创建时间，默认当前时间                 |
+| 字段名            | 类型           | 约束 / 说明                    |
+| -------------- | ------------ | -------------------------- |
+| answer_id      | INT / BIGINT | 主键，自增                      |
+| user_id        | INT / BIGINT | 外键 → User(user_id)         |
+| survey_id      | INT / BIGINT | 外键 → Survey(survey_id)     |
+| question_id    | INT / BIGINT | 外键 → Question(question_id) |
+| answer_content | TEXT         | 用户答案                       |
+| answer_time    | DATETIME     | 答题时间                       |
+
 
 ---
 
@@ -64,18 +67,4 @@
 | question_text  | TEXT                                            | 问题内容                   |
 | question_type  | ENUM('single','multiple','text','must','select') | 题型                     |
 
----
-
-## 6️⃣ 答案表（Answer）
-
-存储用户回答的内容。
-
-| 字段名            | 类型           | 约束 / 说明                    |
-| -------------- | ------------ | -------------------------- |
-| answer_id      | INT / BIGINT | 主键，自增                      |
-| user_id        | INT / BIGINT | 外键 → User(user_id)         |
-| survey_id      | INT / BIGINT | 外键 → Survey(survey_id)     |
-| question_id    | INT / BIGINT | 外键 → Question(question_id) |
-| answer_content | TEXT         | 用户答案                       |
-| answer_time    | DATETIME     | 答题时间                       |
 
