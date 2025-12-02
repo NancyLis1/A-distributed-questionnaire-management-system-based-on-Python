@@ -20,8 +20,8 @@ def insert_test_data():
     # 插入问题
     # -----------------
     q1_id = add_question(survey_id=survey1_id, question_index=1, question_text="你的年龄是多少？", question_type="text")
-    q2_id = add_question(survey_id=survey1_id, question_index=2, question_text="你的性别？", question_type="choice")
-    q3_id = add_question(survey_id=survey2_id, question_index=1, question_text="你喜欢Python吗？", question_type="choice")
+    q2_id = add_question(survey_id=survey1_id, question_index=2, question_text="你的性别？\n男 \n女", question_type="choice")
+    q3_id = add_question(survey_id=survey2_id, question_index=1, question_text="你喜欢Python吗？\n非常喜欢 \n一般喜欢 \n无感 \n讨厌", question_type="choice")
 
     # -----------------
     # 填写 survey1

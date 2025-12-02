@@ -18,7 +18,7 @@ def handle_client(conn, addr):
 
     while True:
         try:
-            data = conn.recv(1024)
+            data = conn.recv(4096)
             if not data:
                 break
             print(f"收到来自 {addr} 的填写内容: {data.decode('utf-8')}")
@@ -32,7 +32,7 @@ def handle_client(conn, addr):
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((HOST, PORT))
-    server.listen(5)
+    server.listen(10)
     print(f"服务器启动，等待客户端连接...  ({HOST}:{PORT})")
 
     while True:
