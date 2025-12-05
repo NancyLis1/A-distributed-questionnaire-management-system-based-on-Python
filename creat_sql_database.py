@@ -5,7 +5,7 @@ def create_db(db_path="survey_system.db"):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # 开启外键支持
+    # 启动外键检查
     cursor.execute("PRAGMA foreign_keys = ON;")
 
     # -------------------
@@ -14,7 +14,9 @@ def create_db(db_path="survey_system.db"):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS User (
         user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_name TEXT NOT NULL,
+        user_name TEXT NOT NULL UNIQUE,
+        phone TEXT UNIQUE,
+        password_hash TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now','localtime')),
         last_login TEXT,
         user_status TEXT NOT NULL,

@@ -1,15 +1,17 @@
-## 1️⃣ 用户表（User）
+## 🟦 User 表的最终结构：
 
-存储用户信息和历史记录引用。
+| 字段            | 类型                   | 描述              |
+| ------------- | -------------------- | --------------- |
+| user_id       | INTEGER PK           | 自动递增            |
+| user_name     | TEXT UNIQUE NOT NULL | 用户名唯一           |
+| phone         | TEXT UNIQUE          | 手机号唯一           |
+| password_hash | TEXT NOT NULL        | 存 SHA-256 哈希    |
+| created_at    | TEXT                 | 默认本地时间          |
+| last_login    | TEXT                 | 登录时间            |
+| user_status   | TEXT NOT NULL        | active / banned |
+| unban_time    | TEXT                 | 解禁时间            |
 
-| 字段名         | 类型           | 约束 / 说明     |
-|-------------|--------------|-------------|
-| user_id     | INT / BIGINT | 主键，自增       |
-| user_name   | VARCHAR(50)  | 唯一，不为空      |
-| created_at  | DATETIME     | 注册时间，默认当前时间 |
-| last_login  | DATETIME     | 可选，最后登录时间   |
-| user_status | TEXT         | 用户状态(是否被封禁） |
-| unban_time  | DATETIME     | 解封时间        |
+---
 
 ---
 

@@ -1,54 +1,35 @@
-from db_utils import add_user, add_survey, add_question, add_answer_survey_history, add_answer, publish_survey
+# test_utils.py
+from db_utils import *
 
-def insert_test_data():
-    # -----------------
-    # 插入用户
-    # -----------------
-    alice_id = add_user("Alice", "active")
-    bob_id = add_user("Bob", "active")
-    charlie_id = add_user("Charlie", "active")
+print("=== 测试开始 ===")
 
-    # -----------------
-    # 插入问卷
-    # -----------------
-    survey1_id = add_survey(created_by=alice_id, survey_status="draft")
-    publish_survey(survey1_id)
-    print("survey1已发布")
-    survey2_id = add_survey(created_by=charlie_id, survey_status="draft")  # 未发布
+# 创建用户
+u1 = add_user("Alice", "13800001111", "pass123")
+u2 = add_user("Bob", "13800002222", "mypwd")
+print("用户创建:", u1, u2)
 
-    # -----------------
-    # 插入问题
-    # -----------------
-    q1_id = add_question(survey_id=survey1_id, question_index=1, question_text="你的年龄是多少？", question_type="text")
-    q2_id = add_question(survey_id=survey1_id, question_index=2, question_text="你的性别？\n男 \n女", question_type="choice")
-    q3_id = add_question(survey_id=survey2_id, question_index=1, question_text="你喜欢Python吗？\n非常喜欢 \n一般喜欢 \n无感 \n讨厌", question_type="choice")
+# 创建问卷
+s1 = add_survey(created_by=u1)
+print("问卷创建: survey_id =", s1)
 
-    # -----------------
-    # 填写 survey1
-    # -----------------
-    add_answer_survey_history(user_id=bob_id, survey_id=survey1_id)
-    add_answer(user_id=bob_id, survey_id=survey1_id, question_id=q1_id, answer_content="25")
-    add_answer(user_id=bob_id, survey_id=survey1_id, question_id=q2_id, answer_content="男")
+# 增加问题
+q1 = add_question(s1, 1, "你喜欢猫吗？\n非常喜欢 \n一般喜欢 \n无感 \n讨厌 \n非常讨厌", "single")
+q2 = add_question(s1, 2, "你每天睡几个小时？", "text")
+q3 = add_question(s1, 3, "你最喜欢的颜色？", "text")
+print("创建问题:", q1, q2, q3)
 
-    # -----------------
-    # 尝试填写未发布问卷 survey2
-    # -----------------
-    try:
-        add_answer_survey_history(user_id=alice_id, survey_id=survey2_id)
-    except ValueError as e:
-        print(f"未发布问卷无法填写: {e}")
+# 发布问卷
+release_time = publish_survey(s1)
+print("问卷已发布，时间:", release_time)
 
-    # -----------------
-    # 发布 survey2
-    # -----------------
-    release_time = publish_survey(survey2_id)
-    print(f"survey2 已发布，release_time={release_time}")
+# 用户填写历史
+h1 = add_answer_survey_history(u2, s1)
+print("填写历史:", h1)
 
-    # 填写 survey2
-    add_answer_survey_history(user_id=alice_id, survey_id=survey2_id)
-    add_answer(user_id=alice_id, survey_id=survey2_id, question_id=q3_id, answer_content="是")
+# 添加答案
+a1 = add_answer(u2, s1, q1, "喜欢")
+a2 = add_answer(u2, s1, q2, "7")
+a3 = add_answer(u2, s1, q3, "蓝色")
+print("回答完成:", a1, a2, a3)
 
-    print("测试数据已插入完成！")
-
-if __name__ == "__main__":
-    insert_test_data()
+print("=== 测试完成 ===")

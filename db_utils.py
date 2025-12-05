@@ -1,49 +1,82 @@
+# utils.py
 import sqlite3
 from typing import Optional, Dict, Any
+from datetime import datetime
+import hashlib
 
 DB_PATH = "survey_system.db"
 
 # -----------------------------
-# 通用执行函数（保留，用于非ID查询）
+# 通用执行函数
 # -----------------------------
 def execute(sql: str, params: tuple = (), fetch: bool = False):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
     cursor.execute(sql, params)
-    result = None
-    if fetch:
-        result = cursor.fetchall()
+    result = cursor.fetchall() if fetch else None
     conn.commit()
     conn.close()
     return result
 
 
 # -----------------------------
+# 哈希密码工具
+# -----------------------------
+def hash_password(pwd: str) -> str:
+    return hashlib.sha256(pwd.encode("utf-8")).hexdigest()
+
+
+# -----------------------------
 # 用户表
 # -----------------------------
-def add_user(user_name: str, user_status: str = "active", unban_time: Optional[str] = None) -> int:
-    """新增用户，返回 user_id"""
+def add_user(user_name: str, phone: str, password: str,
+             user_status: str = "active", unban_time: Optional[str] = None) -> int:
+    """新增用户（用户名唯一 + 手机号唯一 + 密码哈希）"""
+    password_hash = hash_password(password)
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
+
     cursor.execute('''
-        INSERT INTO User (user_name, user_status, unban_time)
-        VALUES (?, ?, ?)
-    ''', (user_name, user_status, unban_time))
-    user_id = cursor.lastrowid  # 同一连接里获取最后插入ID
+        INSERT INTO User (user_name, phone, password_hash, user_status, unban_time)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user_name, phone, password_hash, user_status, unban_time))
+
+    user_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return user_id
 
 
+def get_user_by_login(identifier: str) -> Optional[Dict[str, Any]]:
+    """
+    通过用户名 or 手机号登录（identifier）
+    """
+    sql = """
+    SELECT user_id, user_name, phone, password_hash, user_status
+    FROM User
+    WHERE user_name = ? OR phone = ?
+    """
+    res = execute(sql, (identifier, identifier), fetch=True)
+    if not res:
+        return None
+
+    row = res[0]
+    return {
+        "user_id": row[0],
+        "user_name": row[1],
+        "phone": row[2],
+        "password_hash": row[3],
+        "user_status": row[4]
+    }
+
+
 # -----------------------------
-# 问卷表相关函数
+# 问卷表
 # -----------------------------
 def add_survey(created_by: int, survey_status: str = "draft", release_time: Optional[str] = None) -> int:
-    """
-    新增问卷，返回 survey_id
-    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
@@ -51,43 +84,35 @@ def add_survey(created_by: int, survey_status: str = "draft", release_time: Opti
         INSERT INTO Survey (created_by, survey_status, release_time)
         VALUES (?, ?, ?)
     ''', (created_by, survey_status, release_time))
-    survey_id = cursor.lastrowid  # 在同一连接里获取最后插入 ID
+    survey_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return survey_id
 
+
 def get_survey(survey_id: int) -> Optional[Dict[str, Any]]:
-    """
-    根据 survey_id 获取问卷信息
-    """
     sql = "SELECT * FROM Survey WHERE survey_id = ?"
     res = execute(sql, (survey_id,), fetch=True)
-    if res:
-        row = res[0]
-        return {
-            "survey_id": row[0],
-            "release_time": row[1],
-            "survey_status": row[2],
-            "created_by": row[3],
-            "created_at": row[4]
-        }
-    return None
+    if not res:
+        return None
+    row = res[0]
+    return {
+        "survey_id": row[0],
+        "release_time": row[1],
+        "survey_status": row[2],
+        "created_by": row[3],
+        "created_at": row[4]
+    }
 
-def update_survey_status(survey_id: int, new_status: str):
-    """
-    修改问卷状态
-    """
-    sql = "UPDATE Survey SET survey_status = ? WHERE survey_id = ?"
-    execute(sql, (new_status, survey_id))
 
-def set_survey_release_time(survey_id: int, release_time: str):
-    """
-    设置问卷的发布时间
-    """
-    sql = "UPDATE Survey SET release_time = ? WHERE survey_id = ?"
-    execute(sql, (release_time, survey_id))
-
-    return survey_id
+def publish_survey(survey_id: int):
+    """发布问卷"""
+    release_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execute(
+        "UPDATE Survey SET survey_status = ?, release_time = ? WHERE survey_id = ?",
+        ("active", release_time, survey_id)
+    )
+    return release_time
 
 
 # -----------------------------
@@ -101,26 +126,21 @@ def add_question(survey_id: int, question_index: int, question_text: str, questi
         INSERT INTO Question (survey_id, question_index, question_text, question_type)
         VALUES (?, ?, ?, ?)
     ''', (survey_id, question_index, question_text, question_type))
-    question_id = cursor.lastrowid
+    qid = cursor.lastrowid
     conn.commit()
     conn.close()
-    return question_id
+    return qid
 
 
 # -----------------------------
-# 填写历史表
+# 填写历史表（限制问卷必须 active）
 # -----------------------------
 def add_answer_survey_history(user_id: int, survey_id: int) -> int:
-    """
-    在填写历史表里添加记录。
-    仅允许问卷状态为 'active' 时填写。
-    """
-    # 检查问卷状态
     survey = get_survey(survey_id)
     if not survey:
-        raise ValueError(f"问卷 {survey_id} 不存在")
+        raise ValueError("问卷不存在")
     if survey["survey_status"] != "active":
-        raise ValueError(f"问卷 {survey_id} 尚未发布，无法填写")
+        raise ValueError("问卷未发布，不能填写")
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -129,23 +149,20 @@ def add_answer_survey_history(user_id: int, survey_id: int) -> int:
         INSERT INTO Answer_survey_history (user_id, survey_id)
         VALUES (?, ?)
     ''', (user_id, survey_id))
-    history_id = cursor.lastrowid
+
+    hid = cursor.lastrowid
     conn.commit()
     conn.close()
-    return history_id
+    return hid
+
 
 # -----------------------------
 # 答案表
 # -----------------------------
 def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: str) -> int:
-    """
-    添加用户答案，仅在问卷状态为 'active' 时允许
-    """
     survey = get_survey(survey_id)
-    if not survey:
-        raise ValueError(f"问卷 {survey_id} 不存在")
     if survey["survey_status"] != "active":
-        raise ValueError(f"问卷 {survey_id} 尚未发布，无法填写答案")
+        raise ValueError("问卷未发布，不能填写答案")
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -154,23 +171,8 @@ def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: s
         INSERT INTO Answer (user_id, survey_id, question_id, answer_content)
         VALUES (?, ?, ?, ?)
     ''', (user_id, survey_id, question_id, answer_content))
-    answer_id = cursor.lastrowid
+
+    ans_id = cursor.lastrowid
     conn.commit()
     conn.close()
-    return answer_id
-
-from datetime import datetime
-
-# -----------------------------
-# 发布问卷
-# -----------------------------
-def publish_survey(survey_id: int):
-    """
-    发布问卷：
-    - 将 survey_status 设为 'active'
-    - 将 release_time 设置为当前时间
-    """
-    release_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sql = "UPDATE Survey SET survey_status = ?, release_time = ? WHERE survey_id = ?"
-    execute(sql, ("active", release_time, survey_id))
-    return release_time
+    return ans_id
