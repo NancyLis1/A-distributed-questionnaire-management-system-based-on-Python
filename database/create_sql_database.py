@@ -12,18 +12,19 @@ def create_db(db_path=DB_PATH):
     cursor.execute("PRAGMA foreign_keys = ON;")
 
     # -------------------
-    # 用户表 (未修改)
+    # 用户表（新增 password 字段，用户密码）
     # -------------------
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS User (
-        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_name TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now','localtime')),
-        last_login TEXT,
-        user_status TEXT NOT NULL,
-        unban_time TEXT
-    )
-    ''')
+        CREATE TABLE IF NOT EXISTS User (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_name TEXT NOT NULL,
+            password TEXT NOT NULL,  
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            last_login TEXT,
+            user_status TEXT NOT NULL,
+            unban_time TEXT
+        )
+        ''')
 
     # -------------------
     # 问卷表 (新增 survey_title)

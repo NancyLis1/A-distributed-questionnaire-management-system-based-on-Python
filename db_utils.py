@@ -28,22 +28,17 @@ def hash_password(pwd: str) -> str:
 
 
 # -----------------------------
-# 用户表
+# 用户表（已修改，使得其能接受password参数）
 # -----------------------------
-def add_user(user_name: str, phone: str, password: str,
-             user_status: str = "active", unban_time: Optional[str] = None) -> int:
-    """新增用户（用户名唯一 + 手机号唯一 + 密码哈希）"""
-    password_hash = hash_password(password)
-
+def add_user(user_name: str, password: str, user_status: str = "active", unban_time: Optional[str] = None) -> int:
+    """新增用户，返回 user_id"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
-
     cursor.execute('''
-        INSERT INTO User (user_name, phone, password_hash, user_status, unban_time)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_name, phone, password_hash, user_status, unban_time))
-
+        INSERT INTO User (user_name, password, user_status, unban_time)
+        VALUES (?, ?, ?, ?)
+    ''', (user_name, password, user_status, unban_time)) # 【修改：新增 password 参数】
     user_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -73,17 +68,29 @@ def get_user_by_login(identifier: str) -> Optional[Dict[str, Any]]:
     }
 
 
+def get_user_id_by_name(user_name: str) -> Optional[int]:
+    """根据用户名查找用户ID"""
+    sql = "SELECT user_id FROM User WHERE user_name = ?"
+    res = execute(sql, (user_name,), fetch=True)
+    if res:
+        return res[0][0]
+    return None
+
+
 # -----------------------------
-# 问卷表
+# 问卷表（已修改：适应新增的 survey_title 字段）
 # -----------------------------
-def add_survey(created_by: int, survey_status: str = "draft", release_time: Optional[str] = None) -> int:
+def add_survey(created_by: int, survey_title: str, survey_status: str = "draft", release_time: Optional[str] = None) -> int:
+    """
+    新增问卷，返回 survey_id
+    """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
     cursor.execute('''
-        INSERT INTO Survey (created_by, survey_status, release_time)
-        VALUES (?, ?, ?)
-    ''', (created_by, survey_status, release_time))
+        INSERT INTO Survey (survey_title, created_by, survey_status, release_time)
+        VALUES (?, ?, ?, ?)
+    ''', (survey_title, created_by, survey_status, release_time))
     survey_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -115,6 +122,65 @@ def publish_survey(survey_id: int):
     return release_time
 
 
+
+# -----------------------------
+# 核心查询函数 (供 B 模块使用)
+# -----------------------------
+def get_full_survey_detail(survey_id: int) -> Optional[Dict[str, Any]]:
+    """
+    根据 survey_id 获取完整的问卷、问题、选项详情，用于发送给客户端。
+    返回结构: {survey_id, survey_title, survey_status, questions: [...]}
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # 使用 Row Factory 以名字访问字段
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    # 1. 查询问卷主体信息
+    survey_sql = "SELECT * FROM Survey WHERE survey_id = ?"
+    cursor.execute(survey_sql, (survey_id,))
+    survey_row = cursor.fetchone()
+    if not survey_row:
+        conn.close()
+        return None
+
+    survey_data = dict(survey_row)
+    result = {
+        "survey_id": survey_data["survey_id"],
+        "survey_title": survey_data["survey_title"],
+        "survey_status": survey_data["survey_status"],
+        "created_by": survey_data["created_by"],
+        "release_time": survey_data["release_time"],
+        "questions": []
+    }
+
+    # 2. 查询所有问题
+    questions_sql = "SELECT * FROM Question WHERE survey_id = ? ORDER BY question_index ASC"
+    cursor.execute(questions_sql, (survey_id,))
+    question_rows = cursor.fetchall()
+
+    for q_row in question_rows:
+        question = {
+            "question_id": q_row["question_id"],
+            "index": q_row["question_index"],
+            "text": q_row["question_text"],
+            "type": q_row["question_type"],
+            "options": []  # 默认空列表
+        }
+
+        # 3. 如果是选择题 (choice/radio/checkbox)，查询选项
+        if q_row["question_type"] in ["choice", "radio", "checkbox"]:
+            options_sql = "SELECT option_text FROM Option WHERE question_id = ? ORDER BY option_index ASC"
+            cursor.execute(options_sql, (q_row["question_id"],))
+            option_rows = cursor.fetchall()
+            question["options"] = [r["option_text"] for r in option_rows]
+
+        result["questions"].append(question)
+
+    conn.close()
+    return result
+
+
 # -----------------------------
 # 问题表
 # -----------------------------
@@ -131,6 +197,22 @@ def add_question(survey_id: int, question_index: int, question_text: str, questi
     conn.close()
     return qid
 
+# -----------------------------
+# 选项表
+# -----------------------------
+def add_option(question_id: int, option_index: int, option_text: str) -> int:
+    """新增选择题的选项，返回 option_id"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Option (question_id, option_index, option_text)
+        VALUES (?, ?, ?)
+    ''', (question_id, option_index, option_text))
+    option_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return option_id
 
 # -----------------------------
 # 填写历史表（限制问卷必须 active）
