@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import hashlib
 
-DB_PATH = "survey_system.db"
+DB_PATH = "database/survey_system.db"
 
 # -----------------------------
 # 通用执行函数
