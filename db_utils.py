@@ -1,5 +1,6 @@
 # utils.py
 import sqlite3
+from typing import List, Dict, Any
 from typing import Optional, Dict, Any
 from datetime import datetime
 import hashlib
@@ -98,27 +99,62 @@ def add_survey(created_by: int, survey_title: str, survey_status: str = "draft",
 
 
 def get_survey(survey_id: int) -> Optional[Dict[str, Any]]:
-    sql = "SELECT * FROM Survey WHERE survey_id = ?"
-    res = execute(sql, (survey_id,), fetch=True)
-    if not res:
+    """
+    根据 survey_id 获取问卷主体信息，使用列名访问确保健壮性。
+    """
+    # 明确列出所有需要的字段，包括 survey_title
+    sql = """
+    SELECT survey_id, survey_title, release_time, survey_status, created_by, created_at 
+    FROM Survey 
+    WHERE survey_id = ?
+    """
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # 【关键修改】使用 Row Factory 访问列名
+    cursor = conn.cursor()
+
+    cursor.execute(sql, (survey_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
         return None
-    row = res[0]
+
+    # 【关键修改】现在通过列名访问，避免了索引错误
     return {
-        "survey_id": row[0],
-        "release_time": row[1],
-        "survey_status": row[2],
-        "created_by": row[3],
-        "created_at": row[4]
+        "survey_id": row["survey_id"],
+        "survey_title": row["survey_title"],  # 确保返回 survey_title
+        "release_time": row["release_time"],
+        "survey_status": row["survey_status"],
+        "created_by": row["created_by"],
+        "created_at": row["created_at"]
     }
 
 
+# -----------------------------
+# 发布问卷 (修改后：确保提交)
+# -----------------------------
 def publish_survey(survey_id: int):
-    """发布问卷"""
+    """
+    发布问卷：
+    - 将 survey_status 设为 'active'
+    - 将 release_time 设置为当前时间
+    """
     release_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    execute(
+
+    # 【关键修改】：不再完全依赖 execute，而是自己管理连接和提交
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute(
         "UPDATE Survey SET survey_status = ?, release_time = ? WHERE survey_id = ?",
         ("active", release_time, survey_id)
     )
+
+    conn.commit()  # <--- 这一步是关键！确保更新生效。
+    conn.close()
+
     return release_time
 
 
@@ -181,6 +217,30 @@ def get_full_survey_detail(survey_id: int) -> Optional[Dict[str, Any]]:
     return result
 
 
+def get_public_surveys() -> List[Dict[str, Any]]:
+    """
+    获取所有已发布 (active) 状态的问卷列表。供用户选择填写。
+    """
+    # 仅查询 ID, Title, Creator 和 Release Time
+    sql = """
+        SELECT survey_id, survey_title, created_by, release_time 
+        FROM Survey 
+        WHERE survey_status = 'active' 
+        ORDER BY release_time DESC
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # 确保返回字典格式 (方便转JSON)
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    conn.close()
+
+    # 将 sqlite3.Row 对象转换为标准的 Python 字典列表
+    result = []
+    for row in rows:
+        result.append(dict(row))
+    return result
+
 # -----------------------------
 # 问题表
 # -----------------------------
@@ -239,10 +299,14 @@ def add_answer_survey_history(user_id: int, survey_id: int) -> int:
 
 
 # -----------------------------
-# 答案表
+# 答案表 (增强健壮性)
 # -----------------------------
 def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: str) -> int:
     survey = get_survey(survey_id)
+
+    if not survey:  # 【新增】检查问卷是否存在
+        raise ValueError("问卷不存在")
+
     if survey["survey_status"] != "active":
         raise ValueError("问卷未发布，不能填写答案")
 
