@@ -322,3 +322,65 @@ def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: s
     conn.commit()
     conn.close()
     return ans_id
+
+
+# -----------------------------
+# 获取问卷答案统计
+# -----------------------------
+def get_survey_answers_summary(survey_id: int):
+    """
+    获取指定问卷的答案情况
+    返回结构：
+    {
+        "survey_id": ...,
+        "survey_title": ...,
+        "questions": [
+            {
+                "question_id": ...,
+                "question_text": ...,
+                "answers": [
+                    {"user_id": ..., "answer": ...},
+                    ...
+                ]
+            },
+            ...
+        ]
+    }
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    # 获取问卷标题
+    cursor.execute("SELECT survey_title FROM Survey WHERE survey_id = ?", (survey_id,))
+    survey_row = cursor.fetchone()
+    if not survey_row:
+        conn.close()
+        return None
+
+    result = {
+        "survey_id": survey_id,
+        "survey_title": survey_row["survey_title"],
+        "questions": []
+    }
+
+    # 获取该问卷下所有题目
+    cursor.execute("SELECT question_id, question_text FROM Question WHERE survey_id = ?", (survey_id,))
+    questions = cursor.fetchall()
+
+    for q in questions:
+        question_id = q["question_id"]
+        cursor.execute(
+            "SELECT user_id, answer_content FROM Answer WHERE survey_id = ? AND question_id = ?",
+            (survey_id, question_id)
+        )
+        answers = cursor.fetchall()
+        result["questions"].append({
+            "question_id": question_id,
+            "question_text": q["question_text"],
+            "answers": [{"user_id": a["user_id"], "answer": a["answer_content"]} for a in answers]
+        })
+
+    conn.close()
+    return result
