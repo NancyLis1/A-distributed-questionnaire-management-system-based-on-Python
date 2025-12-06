@@ -52,58 +52,50 @@ class MainWindow:
         self.master = master
         self.user_id = user_id
 
+        # 使用 Toplevel 而不是新建 Tk() python module_b/fill_survey_gui.py
         self.win = tk.Toplevel(master)
-        self.win.title("选择问卷")
+        self.win.title("问卷填写")
         self.win.geometry("500x400")
 
-        self.container = tk.Frame(self.win)
-        self.container.pack(fill="both", expand=True)
+        ttk.Label(self.win, text="可填写的问卷", font=("Arial", 16)).pack(pady=10)
 
-        self.refresh()   # ← 初始化时直接调用
-
-    def refresh(self):
-        # 清空旧内容
-        for widget in self.container.winfo_children():
-            widget.destroy()
+        self.listbox = tk.Listbox(self.win, width=50, height=15)
+        self.listbox.pack()
 
         surveys = db.get_public_surveys()
-        filled_surveys = db.get_surveys_filled_by_user(self.user_id)
+        self.surveys = surveys
 
-        tk.Label(self.container, text="请选择要填写的问卷：").pack(pady=10)
+        for s in surveys:
+            self.listbox.insert(tk.END, f"{s['survey_id']}. {s['survey_title']}")
 
-        for survey in surveys:
-            sid = survey["survey_id"]
-            title = survey["survey_title"]
+        ttk.Button(self.win, text="开始填写", command=self.open_survey).pack(pady=10)
 
-            if sid in filled_surveys:
-                display_name = f"{title} 【已填写】"
-                btn = tk.Button(self.container, text=display_name, state="disabled")
-            else:
-                display_name = title
-                btn = tk.Button(
-                    self.container,
-                    text=display_name,
-                    command=lambda s=sid: self.open_fill_window(s)
-                )
+    def open_survey(self):
+        idx = self.listbox.curselection()
+        if not idx:
+            messagebox.showerror("错误", "请先选择一个问卷")
+            return
 
-            btn.pack(pady=5, fill="x", padx=20)
+        survey = self.surveys[idx[0]]
+        survey_id = survey["survey_id"]
 
-    def open_fill_window(self, survey_id):
-        # 传入两个参数：main_window_self（用于刷新）和 parent_win（用于层级）
-        FillSurveyWindow(main_window=self, parent_win=self.win, user_id=self.user_id, survey_id=survey_id)
+        # 打开填写问卷窗口
+        FillSurveyWindow(self.master, self.user_id, survey_id)
+
+        # 隐藏问卷列表窗口
+        self.win.withdraw()
 
 
 # ---------------------------
 # 问卷填写窗口
 # ---------------------------
 class FillSurveyWindow:
-    def __init__(self, main_window, parent_win, user_id, survey_id):
-        self.main_window = main_window
-        self.parent_win = parent_win
+    def __init__(self, master, user_id, survey_id):
+        self.master = master
         self.user_id = user_id
         self.survey_id = survey_id
 
-        self.win = tk.Toplevel(parent_win)
+        self.win = tk.Toplevel(master)
         self.win.title("填写问卷")
         self.win.geometry("600x600")
 
@@ -160,31 +152,6 @@ class FillSurveyWindow:
         ttk.Button(self.win, text="提交问卷", command=self.submit_answers).pack(pady=20)
 
     def submit_answers(self):
-        # ========= 必填校验 ==========
-        for q in self.survey_data["questions"]:
-            qid = q["question_id"]
-            widget = self.answer_widgets[qid]
-
-            if q["type"] in ("choice", "radio"):
-                # 单选题必须选
-                if widget.get() == "":
-                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未作答（单选题）。")
-                    return
-
-            elif q["type"] == "checkbox":
-                # 多选题至少一个
-                selected = [opt for opt, v in widget if v.get()]
-                if len(selected) == 0:
-                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未作答（多选题）。")
-                    return
-
-            elif q["type"] == "text":
-                # 文本题不能为空（你可根据需求是否允许空）
-                if widget.get().strip() == "":
-                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未填写（文本题）。")
-                    return
-
-        # ========= 校验通过后才允许提交 ==========
         db.add_answer_survey_history(self.user_id, self.survey_id)
 
         for q in self.survey_data["questions"]:
@@ -193,21 +160,18 @@ class FillSurveyWindow:
 
             if q["type"] in ("choice", "radio"):
                 ans = widget.get()
-
             elif q["type"] == "checkbox":
                 ans = ",".join(opt for opt, v in widget if v.get())
-
-            else:  # text
-                ans = widget.get().strip()
+            else:
+                ans = widget.get()
 
             db.add_answer(self.user_id, self.survey_id, qid, ans)
 
         messagebox.showinfo("成功", "问卷填写完成！")
 
+        # 关闭问卷填写窗口并显示主窗口
         self.win.destroy()
-        self.main_window.refresh()  # ← 刷新问卷列表
-
-        self.parent_win.deiconify()
+        self.master.deiconify()
 
 
 # ---------------------------

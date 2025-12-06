@@ -384,3 +384,27 @@ def get_survey_answers_summary(survey_id: int):
 
     conn.close()
     return result
+
+def get_surveys_filled_by_user(user_id: int):
+    """
+    返回指定用户填写过的问卷列表（survey_id 列表）
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    # 根据 Answer_survey_history 表判断用户是否填写过某问卷
+    cursor.execute(
+        """
+        SELECT DISTINCT survey_id
+        FROM Answer_survey_history
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [r["survey_id"] for r in rows]
