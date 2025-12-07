@@ -1,4 +1,4 @@
-# tests/test_survey_list.py
+# tests/test_a_survey_list.py
 import os
 import sys
 import json

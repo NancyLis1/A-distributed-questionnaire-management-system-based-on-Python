@@ -152,6 +152,25 @@ def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: s
     conn.close()
     return ans_id
 
+# -----------------------------
+# 7.违规管理 - 写入接口 (供 Manager 使用)
+# -----------------------------
+def add_violation(survey_id: int, reason: str, status: str = 'pending', handled_by: Optional[int] = None) -> int:
+    """
+    记录违规信息。
+    注意：时间 (reported_at) 由数据库自动生成，无需传入。
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Violation (survey_id, reason, status, handled_by)
+        VALUES (?, ?, ?, ?)
+    ''', (survey_id, reason, status, handled_by))
+    violation_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return violation_id
 
 
 # ==========================================
@@ -391,6 +410,47 @@ def get_surveys_filled_by_user(user_id: int):
     conn.close()
 
     return [r["survey_id"] for r in rows]
+
+
+# -----------------------------
+# 违规管理 - 查询接口 (供 管理员界面/C模块 使用)
+# -----------------------------
+def get_all_violations() -> List[Dict[str, Any]]:
+    """
+    获取详细的违规列表。
+    同时返回 survey_id, user_id (发布者), reason, time等
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # 让结果像字典一样访问
+    cursor = conn.cursor()
+
+    # 核心 SQL：联表查询 (JOIN)
+    # v = Violation 表, s = Survey 表, u = User 表
+    sql = """
+    SELECT 
+        v.violation_id,
+        v.reason,
+        v.reported_at as time,    
+        v.status,
+        v.survey_id,              
+        s.survey_title,
+        s.created_by as user_id,  
+        u.user_name              
+    FROM Violation v
+    JOIN Survey s ON v.survey_id = s.survey_id
+    JOIN User u ON s.created_by = u.user_id
+    ORDER BY v.reported_at DESC
+    """
+
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    conn.close()
+
+    # 转换为字典列表
+    result = []
+    for row in rows:
+        result.append(dict(row))
+    return result
 
 
 # ==========================================

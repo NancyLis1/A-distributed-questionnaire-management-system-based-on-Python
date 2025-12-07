@@ -1,4 +1,4 @@
-# tests/test_collaboration.py
+# tests/test_a_collaboration.py
 import os
 import sys
 import json
