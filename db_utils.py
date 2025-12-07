@@ -323,7 +323,48 @@ def get_public_surveys() -> List[Dict[str, Any]]:
         result.append(dict(row))
     return result
 
+def get_public_surveys_by_user_id(user_id: int) -> List[Dict[str, Any]]:
+    """
+    根据用户ID获取该用户发布的所有 active 状态问卷。
+    """
+    sql = """
+        SELECT survey_id, survey_title, created_by, release_time
+        FROM Survey
+        WHERE survey_status = 'active'
+          AND created_by = ?
+        ORDER BY release_time DESC
+    """
 
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(sql, (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
+
+def get_public_surveys_by_username(username: str) -> List[Dict[str, Any]]:
+    """
+    根据 username 获取该用户发布的所有 active 问卷。
+    """
+    sql = """
+        SELECT s.survey_id, s.survey_title, s.created_by, s.release_time
+        FROM Survey s
+        JOIN User u ON s.created_by = u.user_id
+        WHERE s.survey_status = 'active'
+          AND u.user_name = ?
+        ORDER BY s.release_time DESC
+    """
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(sql, (username,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(row) for row in rows]
 
 
 # -----------------------------
