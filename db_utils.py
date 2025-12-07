@@ -28,8 +28,13 @@ def hash_password(pwd: str) -> str:
     return hashlib.sha256(pwd.encode("utf-8")).hexdigest()
 
 
+
+# ==========================================
+# CRUD实现1：Create（创建）
+# ==========================================
+
 # -----------------------------
-# 用户表（已修改，使得其能接受password参数）
+# 1.用户表（已修改，使得其能接受password参数）
 # -----------------------------
 def add_user(user_name: str, password: str, user_status: str = "active", unban_time: Optional[str] = None) -> int:
     """新增用户，返回 user_id"""
@@ -45,6 +50,113 @@ def add_user(user_name: str, password: str, user_status: str = "active", unban_t
     conn.close()
     return user_id
 
+# -----------------------------
+# 2.问卷表（已修改：适应新增的 survey_title 字段）
+# -----------------------------
+def add_survey(created_by: int, survey_title: str, survey_status: str = "draft", release_time: Optional[str] = None) -> int:
+    """
+    新增问卷，返回 survey_id
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Survey (survey_title, created_by, survey_status, release_time)
+        VALUES (?, ?, ?, ?)
+    ''', (survey_title, created_by, survey_status, release_time))
+    survey_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return survey_id
+
+
+# -----------------------------
+# 3.问题表
+# -----------------------------
+def add_question(survey_id: int, question_index: int, question_text: str, question_type: str) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Question (survey_id, question_index, question_text, question_type)
+        VALUES (?, ?, ?, ?)
+    ''', (survey_id, question_index, question_text, question_type))
+    qid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return qid
+
+# -----------------------------
+# 4.选项表
+# -----------------------------
+def add_option(question_id: int, option_index: int, option_text: str) -> int:
+    """新增选择题的选项，返回 option_id"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Option (question_id, option_index, option_text)
+        VALUES (?, ?, ?)
+    ''', (question_id, option_index, option_text))
+    option_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return option_id
+
+# -----------------------------
+# 5.填写历史表（限制问卷必须 active）
+# -----------------------------
+def add_answer_survey_history(user_id: int, survey_id: int) -> int:
+    survey = get_survey(survey_id)
+    if not survey:
+        raise ValueError("问卷不存在")
+    if survey["survey_status"] != "active":
+        raise ValueError("问卷未发布，不能填写")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Answer_survey_history (user_id, survey_id)
+        VALUES (?, ?)
+    ''', (user_id, survey_id))
+
+    hid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return hid
+
+
+# -----------------------------
+# 6.答案表 (增强健壮性)
+# -----------------------------
+def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: str) -> int:
+    survey = get_survey(survey_id)
+
+    if not survey:  # 【新增】检查问卷是否存在
+        raise ValueError("问卷不存在")
+
+    if survey["survey_status"] != "active":
+        raise ValueError("问卷未发布，不能填写答案")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute('''
+        INSERT INTO Answer (user_id, survey_id, question_id, answer_content)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, survey_id, question_id, answer_content))
+
+    ans_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return ans_id
+
+
+
+# ==========================================
+# CRUD实现2：Read（读取）
+# ==========================================
 
 def get_user_by_login(identifier: str) -> Optional[Dict[str, Any]]:
     """
@@ -77,27 +189,6 @@ def get_user_id_by_name(user_name: str) -> Optional[int]:
         return res[0][0]
     return None
 
-
-# -----------------------------
-# 问卷表（已修改：适应新增的 survey_title 字段）
-# -----------------------------
-def add_survey(created_by: int, survey_title: str, survey_status: str = "draft", release_time: Optional[str] = None) -> int:
-    """
-    新增问卷，返回 survey_id
-    """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute('''
-        INSERT INTO Survey (survey_title, created_by, survey_status, release_time)
-        VALUES (?, ?, ?, ?)
-    ''', (survey_title, created_by, survey_status, release_time))
-    survey_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return survey_id
-
-
 def get_survey(survey_id: int) -> Optional[Dict[str, Any]]:
     """
     根据 survey_id 获取问卷主体信息，使用列名访问确保健壮性。
@@ -129,34 +220,6 @@ def get_survey(survey_id: int) -> Optional[Dict[str, Any]]:
         "created_by": row["created_by"],
         "created_at": row["created_at"]
     }
-
-
-# -----------------------------
-# 发布问卷 (修改后：确保提交)
-# -----------------------------
-def publish_survey(survey_id: int):
-    """
-    发布问卷：
-    - 将 survey_status 设为 'active'
-    - 将 release_time 设置为当前时间
-    """
-    release_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # 【关键修改】：不再完全依赖 execute，而是自己管理连接和提交
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute(
-        "UPDATE Survey SET survey_status = ?, release_time = ? WHERE survey_id = ?",
-        ("active", release_time, survey_id)
-    )
-
-    conn.commit()  # <--- 这一步是关键！确保更新生效。
-    conn.close()
-
-    return release_time
-
 
 
 # -----------------------------
@@ -241,87 +304,7 @@ def get_public_surveys() -> List[Dict[str, Any]]:
         result.append(dict(row))
     return result
 
-# -----------------------------
-# 问题表
-# -----------------------------
-def add_question(survey_id: int, question_index: int, question_text: str, question_type: str) -> int:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute('''
-        INSERT INTO Question (survey_id, question_index, question_text, question_type)
-        VALUES (?, ?, ?, ?)
-    ''', (survey_id, question_index, question_text, question_type))
-    qid = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return qid
 
-# -----------------------------
-# 选项表
-# -----------------------------
-def add_option(question_id: int, option_index: int, option_text: str) -> int:
-    """新增选择题的选项，返回 option_id"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute('''
-        INSERT INTO Option (question_id, option_index, option_text)
-        VALUES (?, ?, ?)
-    ''', (question_id, option_index, option_text))
-    option_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return option_id
-
-# -----------------------------
-# 填写历史表（限制问卷必须 active）
-# -----------------------------
-def add_answer_survey_history(user_id: int, survey_id: int) -> int:
-    survey = get_survey(survey_id)
-    if not survey:
-        raise ValueError("问卷不存在")
-    if survey["survey_status"] != "active":
-        raise ValueError("问卷未发布，不能填写")
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute('''
-        INSERT INTO Answer_survey_history (user_id, survey_id)
-        VALUES (?, ?)
-    ''', (user_id, survey_id))
-
-    hid = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return hid
-
-
-# -----------------------------
-# 答案表 (增强健壮性)
-# -----------------------------
-def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: str) -> int:
-    survey = get_survey(survey_id)
-
-    if not survey:  # 【新增】检查问卷是否存在
-        raise ValueError("问卷不存在")
-
-    if survey["survey_status"] != "active":
-        raise ValueError("问卷未发布，不能填写答案")
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute('''
-        INSERT INTO Answer (user_id, survey_id, question_id, answer_content)
-        VALUES (?, ?, ?, ?)
-    ''', (user_id, survey_id, question_id, answer_content))
-
-    ans_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return ans_id
 
 
 # -----------------------------
@@ -408,3 +391,92 @@ def get_surveys_filled_by_user(user_id: int):
     conn.close()
 
     return [r["survey_id"] for r in rows]
+
+
+# ==========================================
+# CRUD实现：Update (更新) & Delete (删除) 接口
+# ==========================================
+
+# -----------------------------
+# 发布问卷 (修改后：确保提交)
+# -----------------------------
+def publish_survey(survey_id: int):
+    """
+    发布问卷：
+    - 将 survey_status 设为 'active'
+    - 将 release_time 设置为当前时间
+    """
+    release_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 【关键修改】：不再完全依赖 execute，而是自己管理连接和提交
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    cursor.execute(
+        "UPDATE Survey SET survey_status = ?, release_time = ? WHERE survey_id = ?",
+        ("active", release_time, survey_id)
+    )
+
+    conn.commit()  # <--- 这一步是关键！确保更新生效。
+    conn.close()
+
+    return release_time
+
+# -----------------------------
+# 1. 问卷管理 (状态变更与删除)
+# -----------------------------
+
+def update_survey_status(survey_id: int, new_status: str):
+    """
+    更新问卷状态 (如: draft -> active -> closed)
+    用于发布问卷或关停问卷
+    """
+    sql = "UPDATE Survey SET survey_status = ? WHERE survey_id = ?"
+    execute(sql, (new_status, survey_id))
+
+def delete_survey(survey_id: int):
+    """
+    物理删除问卷。
+    由于 init_db.py 中设置了 ON DELETE CASCADE，
+    删除 Survey 会自动删除关联的 Question, Option, Answer, History。
+    """
+    sql = "DELETE FROM Survey WHERE survey_id = ?"
+    execute(sql, (survey_id,))
+
+# -----------------------------
+# 2. 问卷编辑 (修改题目/选项文本)
+# -----------------------------
+
+def update_survey_title(survey_id: int, new_title: str):
+    """修改问卷标题"""
+    sql = "UPDATE Survey SET survey_title = ? WHERE survey_id = ?"
+    execute(sql, (new_title, survey_id))
+
+def update_question_text(question_id: int, new_text: str):
+    """修改问题题干"""
+    sql = "UPDATE Question SET question_text = ? WHERE question_id = ?"
+    execute(sql, (new_text, question_id))
+
+def update_option_text(option_id: int, new_text: str):
+    """修改选项文字"""
+    sql = "UPDATE Option SET option_text = ? WHERE option_id = ?"
+    execute(sql, (new_text, option_id))
+
+# -----------------------------
+# 3. 问卷编辑 (删除题目/选项)
+# -----------------------------
+
+def delete_question(question_id: int):
+    """
+    删除单个问题 (级联删除该问题的选项和对应的答案)
+    """
+    sql = "DELETE FROM Question WHERE question_id = ?"
+    execute(sql, (question_id,))
+
+def delete_option(option_id: int):
+    """
+    删除单个选项
+    """
+    sql = "DELETE FROM Option WHERE option_id = ?"
+    execute(sql, (option_id,))
