@@ -150,17 +150,6 @@ class QuestionWidget(tk.Frame):
         for widget in self.options_container.winfo_children():
             widget.destroy()
 
-        # 遍历选项字符串列表 (db_utils 返回的是列表字符串)
-        # 我们需要从 Option 表重新查 ID 才能修改，这里简化：假设 get_full_survey_detail 修改为返回 ID
-        # 由于 Phase 3 get_full_survey_detail 只返回了 text list，
-        # 为了实现精确修改选项，我们需要修改 db_utils 或在这里做 trick。
-        # 【注意】为了不改动太多底层，这里我们使用简单的“删旧增新”逻辑，或者需要 db_utils 支持
-        # 为了演示，我们假设 options 是简单的文本列表，修改时我们只做 UI 演示，
-        # 实际修改需要 update_option_text 支持 option_id。
-
-        # 临时方案：我们在 UI 上只显示文本框，保存时我们可能需要更复杂的逻辑。
-        # 鉴于时间，我们假设 q_data['options_detail'] 存在 (需要修改 db_utils 返回 options 的 id)
-        # *为了代码能跑，我们先做简单处理：从 DB 重新查 Option ID*
 
         import sqlite3
         conn = sqlite3.connect("database/survey_system.db")
