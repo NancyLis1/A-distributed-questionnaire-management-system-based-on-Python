@@ -97,9 +97,17 @@ class MainWindow:
 
         self.win = tk.Toplevel(master)
         self.win.title("选择问卷")
-        self.win.geometry("600x450")
+        self.master.update_idletasks()  # 确保 master 尺寸是最新的
+        w = self.master.winfo_width()
+        h = self.master.winfo_height()
+        x = self.master.winfo_x()
+        y = self.master.winfo_y()
 
-        self.container = tk.Frame(self.win)
+        self.win.geometry(f"{w}x{h}+{x}+{y}")
+
+        self.win.configure(bg="#F0F2F5")
+
+        self.container = tk.Frame(self.win, bg="#F0F2F5")
         self.container.pack(fill="both", expand=True)
 
         # 保存当前过滤条件（None 表示不过滤）
@@ -109,34 +117,60 @@ class MainWindow:
         self.create_search_bar()
         self.refresh()
 
+        self.back_btn = ttk.Button(
+            self.win,
+            text="返回上一个界面",
+            command=self.back_to_previous
+        )
+
+        # 右下角定位
+        self.back_btn.place(relx=0.98, rely=0.96, anchor="se")
+
+    def back_to_previous(self):
+        """返回上一个界面，并关闭当前窗口"""
+        self.win.destroy()  # 关闭当前 MainWindow
+        self.master.deiconify()  # 显示上一个窗口
+
     # ------------------------------
     # 搜索区（新增）
     # ------------------------------
     def create_search_bar(self):
-        bar = tk.Frame(self.container)
-        bar.pack(fill="x", pady=10)
+        bar = tk.Frame(self.container, bg="#F0F2F5")
+        bar.pack(fill="x", pady=10, padx=10)
 
-        # 输入框（左侧）
-        self.search_entry = ttk.Entry(bar, width=20)
-        self.search_entry.pack(side="left", padx=10)
+        self.search_entry = tk.Entry(
+            bar, width=18,
+            bg="white", bd=0, font=("Arial", 11)
+        )
+        self.search_entry.pack(side="left", padx=6, ipady=5)
 
-        # 搜索方式（中间）
         self.search_mode = ttk.Combobox(
             bar,
             values=["按问卷ID", "按用户名", "按用户ID"],
             state="readonly",
-            width=12
+            width=10
         )
         self.search_mode.current(0)
-        self.search_mode.pack(side="left", padx=10)
+        self.search_mode.pack(side="left", padx=6)
 
-        # 搜索按钮（右侧）
-        search_btn = ttk.Button(bar, text="搜索", command=self.apply_filter)
-        search_btn.pack(side="left", padx=10)
+        search_btn = tk.Button(
+            bar,
+            text="搜索",
+            bg="#2196F3",
+            fg="white",
+            relief="flat",
+            command=self.apply_filter
+        )
+        search_btn.pack(side="left", padx=6, ipadx=10)
 
-        # 重置按钮（恢复默认）
-        reset_btn = ttk.Button(bar, text="重置", command=self.reset_filter)
-        reset_btn.pack(side="left", padx=10)
+        reset_btn = tk.Button(
+            bar,
+            text="重置",
+            bg="#E0E0E0",
+            relief="flat",
+            command=self.reset_filter
+        )
+        reset_btn.pack(side="left", padx=6, ipadx=10)
 
     # ------------------------------
     # 执行搜索
@@ -218,12 +252,27 @@ class MainWindow:
 
             if sid in filled_surveys:
                 display_name = f"{title} 【已填写】"
-                btn = tk.Button(self.container, text=display_name, state="disabled")
+                btn = tk.Button(
+                    self.container,
+                    text=display_name,
+                    bg="#EEEEEE",
+                    fg="gray",
+                    relief="flat",
+                    state="disabled",
+                    font=("Arial", 11),
+                    anchor="w",
+                    padx=12
+                )
             else:
                 display_name = title
                 btn = tk.Button(
                     self.container,
                     text=display_name,
+                    bg="white",
+                    relief="flat",
+                    font=("Arial", 11),
+                    anchor="w",
+                    padx=12,
                     command=lambda s=sid: self.open_fill_window(s)
                 )
 
@@ -239,21 +288,36 @@ class MainWindow:
 # ---------------------------
 class FillSurveyWindow:
     def __init__(self, main_window, parent_win, user_id, survey_id):
+
         self.main_window = main_window
         self.parent_win = parent_win
         self.user_id = user_id
         self.survey_id = survey_id
 
         self.win = tk.Toplevel(parent_win)
+        self.win.configure(bg="#F0F2F5")
+
         self.win.title("填写问卷")
-        self.win.geometry("600x600")
+        self.parent_win.update_idletasks()  # 确保 master 尺寸是最新的
+        w = self.parent_win.winfo_width()
+        h = self.parent_win.winfo_height()
+        x = self.parent_win.winfo_x()
+        y = self.parent_win.winfo_y()
+
+        self.win.geometry(f"{w}x{h}+{x}+{y}")
 
         survey_data = db.get_full_survey_detail(survey_id)
         self.survey_data = survey_data
 
         self.violation_checker = AnswerViolationChecker()
 
-        ttk.Label(self.win, text=survey_data["survey_title"], font=("Arial", 18)).pack(pady=10)
+        ttk.Label(
+            self.win,
+            text=survey_data["survey_title"],
+            font=("Arial", 18, "bold"),
+            foreground="#2196F3",
+            background="#F0F2F5"
+        ).pack(pady=15)
 
         # 创建可滚动区域
         canvas = tk.Canvas(self.win)
@@ -300,11 +364,26 @@ class FillSurveyWindow:
                 entry.pack(anchor="w")
                 self.answer_widgets[q["question_id"]] = entry
 
-        submit_btn = ttk.Button(self.win, text="提交问卷", command=self.submit_answers)
-        submit_btn.pack(pady=20)
+        submit_btn = tk.Button(
+            self.win,
+            text="提交问卷",
+            bg="#2196F3",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            relief="flat",
+            command=self.submit_answers
+        )
+        submit_btn.pack(pady=(25, 10), ipadx=20, ipady=6)
 
-        back_btn = ttk.Button(self.win, text="返回主界面（不保存）", command=self.back_to_main)
-        back_btn.pack(pady=10)
+        back_btn = tk.Button(
+            self.win,
+            text="返回主界面（不保存）",
+            bg="#E0E0E0",
+            relief="flat",
+            font=("Arial", 11),
+            command=self.back_to_main
+        )
+        back_btn.pack(pady=(0, 20), ipadx=20, ipady=6)
 
     def back_to_main(self):
         """
