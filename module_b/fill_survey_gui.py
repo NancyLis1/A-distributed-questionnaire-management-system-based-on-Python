@@ -5,7 +5,7 @@ import os
 
 # 让程序能找到根目录的 db_utils.py
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import db_utils as db
+import db_proxy as db
 
 # ======== 违规词检查（使用 module_a/banned_words.txt） ========
 import os

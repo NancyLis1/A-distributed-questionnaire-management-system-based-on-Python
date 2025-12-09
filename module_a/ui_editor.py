@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox, simpledialog
 from datetime import datetime
 
 # 引入后端接口
-from db_utils import (
+from db_proxy import (
     add_survey, add_question, add_option,
     get_full_survey_detail, update_survey_title,
     update_question_text, update_option_text,

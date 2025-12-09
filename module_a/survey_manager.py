@@ -5,7 +5,7 @@ import os
 # 路径适配，确保能引用根目录的 db_utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from db_utils import (
+from db_proxy import (
     add_survey, add_question, add_option,
     get_full_survey_detail, add_violation, update_survey_status
 )
