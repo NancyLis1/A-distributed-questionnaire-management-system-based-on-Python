@@ -5,8 +5,13 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import hashlib
 
-DB_PATH = "database/survey_system.db"
+import os
 
+# 获取当前脚本所在目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 数据库绝对路径
+DB_PATH = os.path.join(BASE_DIR, "database", "survey_system.db")
 # -----------------------------
 # 通用执行函数
 # -----------------------------
@@ -451,24 +456,6 @@ def get_surveys_filled_by_user(user_id: int):
     conn.close()
 
     return [r["survey_id"] for r in rows]
-
-
-
-def has_user_answered_survey(user_id: int, survey_id: int) -> bool:
-    """
-    检查指定用户是否已经填写过指定问卷。
-    用于 B 模块在网络端防止用户重复提交。
-    """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    sql = "SELECT 1 FROM Answer_survey_history WHERE user_id = ? AND survey_id = ? LIMIT 1"
-    cursor.execute(sql, (user_id, survey_id))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    return row is not None
 
 
 # -----------------------------
