@@ -1,6 +1,3 @@
-import json
-import socket
-import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
@@ -8,7 +5,7 @@ import os
 
 # 让程序能找到根目录的 db_utils.py
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import db_proxy as db
+import db_utils as db
 
 # ======== 违规词检查（使用 module_a/banned_words.txt） ========
 import os
@@ -71,56 +68,32 @@ class UsernameWindow:
 
     def submit(self):
         username = self.username_entry.get().strip()
-        # ✅ 建立 socket 并登录
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("127.0.0.1", 5000))
-
-        user_id = db.get_user_id_by_name(socket, username)
-        login_msg = {"action": "login", "params": {"user_id": user_id}}
-        sock.sendall(json.dumps(login_msg).encode("utf-8"))
 
         if not username:
             messagebox.showerror("错误", "用户名不能为空")
             return
 
+        user_id = db.get_user_id_by_name(username)
         if not user_id:
             messagebox.showerror("错误", "用户不存在，请检查用户名")
             return
 
-        # 后台线程监听强制下线
-        def listen_server():
-            try:
-                while True:
-                    data = sock.recv(4096)
-                    if not data:
-                        break
-                    msg = json.loads(data.decode("utf-8"))
-                    if msg.get("action") == "force_logout":
-                        messagebox.showinfo("提示", "你的账号在另一界面登录，你已被强制退出")
-                        self.master.destroy()  # 关闭整个程序
-                        break
-            except:
-                pass
-            finally:
-                sock.close()
-
-        threading.Thread(target=listen_server, daemon=True).start()
-
         messagebox.showinfo("成功", f"欢迎你，{username}")
+
+        # 隐藏登录窗口
         self.master.withdraw()
 
-        # ✅ 传入 socket
-        MainWindow(self.master, user_id, sock)
+        # 打开问卷列表窗口
+        MainWindow(self.master, user_id)
 
 
 # ---------------------------
 # 主窗口：问卷列表
 # ---------------------------
 class MainWindow:
-    def __init__(self, master, user_id,sock):
+    def __init__(self, master, user_id):
         self.master = master
         self.user_id = user_id
-        self.sock = sock
 
         self.win = tk.Toplevel(master)
         self.win.title("选择问卷")
@@ -244,7 +217,7 @@ class MainWindow:
         tk.Label(self.container, text="请选择要填写的问卷：").pack(pady=5)
 
         # 获取所有 public 问卷
-        all_surveys = db.get_public_surveys(self.sock)
+        all_surveys = db.get_public_surveys()
 
         # 根据过滤条件做筛选
         surveys = []
@@ -261,16 +234,16 @@ class MainWindow:
                     surveys = []
 
             elif self.filter_type == "username":
-                surveys = db.get_public_surveys_by_username(self.sock,self.filter_value)
+                surveys = db.get_public_surveys_by_username(self.filter_value)
 
             elif self.filter_type == "user_id":
                 try:
                     uid = int(self.filter_value)
-                    surveys = db.get_public_surveys_by_user_id(self.sock,uid)
+                    surveys = db.get_public_surveys_by_user_id(uid)
                 except:
                     surveys = []
 
-        filled_surveys = db.get_surveys_filled_by_user(self.sock,self.user_id)
+        filled_surveys = db.get_surveys_filled_by_user(self.user_id)
 
         # 显示问卷列表
         for survey in surveys:
@@ -308,14 +281,14 @@ class MainWindow:
     def open_fill_window(self, survey_id):
         self.win.withdraw()
         FillSurveyWindow(main_window=self, parent_win=self.win,
-                         user_id=self.user_id, survey_id=survey_id,sock=self.sock)
+                         user_id=self.user_id, survey_id=survey_id)
 
 # ---------------------------
 # 问卷填写窗口
 # ---------------------------
 class FillSurveyWindow:
-    def __init__(self, main_window, parent_win, user_id, survey_id,sock):
-        self.sock = sock
+    def __init__(self, main_window, parent_win, user_id, survey_id):
+
         self.main_window = main_window
         self.parent_win = parent_win
         self.user_id = user_id
@@ -333,7 +306,7 @@ class FillSurveyWindow:
 
         self.win.geometry(f"{w}x{h}+{x}+{y}")
 
-        survey_data = db.get_full_survey_detail(self.sock,survey_id)
+        survey_data = db.get_full_survey_detail(survey_id)
         self.survey_data = survey_data
 
         self.violation_checker = AnswerViolationChecker()
@@ -478,7 +451,7 @@ class FillSurveyWindow:
 
 
         # ========= 校验通过后才允许提交 ==========
-        db.add_answer_survey_history(self.sock,self.user_id, self.survey_id)
+        db.add_answer_survey_history(self.user_id, self.survey_id)
 
         for q in self.survey_data["questions"]:
             qid = q["question_id"]
@@ -493,7 +466,7 @@ class FillSurveyWindow:
             else:  # text
                 ans = widget.get().strip()
 
-            db.add_answer(self.sock,self.user_id, self.survey_id, qid, ans)
+            db.add_answer(self.user_id, self.survey_id, qid, ans)
 
         messagebox.showinfo("成功", "问卷填写完成！")
 

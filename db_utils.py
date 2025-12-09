@@ -5,13 +5,8 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import hashlib
 
-import os
+DB_PATH = "database/survey_system.db"
 
-# 获取当前脚本所在目录
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 数据库绝对路径
-DB_PATH = os.path.join(BASE_DIR, "database", "survey_system.db")
 # -----------------------------
 # 通用执行函数
 # -----------------------------

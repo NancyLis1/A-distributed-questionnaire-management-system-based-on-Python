@@ -1,6 +1,6 @@
 # user_system_tkinter.py
 import sqlite3
-from db_proxy import *
+from db_utils import *
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional

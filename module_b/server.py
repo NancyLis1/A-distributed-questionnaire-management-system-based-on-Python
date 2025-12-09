@@ -1,81 +1,45 @@
 import socket
-import json
 import threading
-import sys, os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from db_utils import *
+# 服务器 IP 和端口
+HOST = '127.0.0.1'
+PORT = 9000
 
-HOST = "0.0.0.0"
-PORT = 5000
+# 启动服务器时输入模板
+template = input("请输入该次问卷模板内容：\n")
 
-lock = threading.Lock()
-active_users = {}  # user_id -> conn
 
+# 客户端处理线程
 def handle_client(conn, addr):
-    user_id = None
-    try:
-        while True:
-            data = conn.recv(65536)
+    print(f"客户端 {addr} 已连接")
+
+    # 发送模板给客户端
+    conn.sendall(template.encode('utf-8'))
+
+    while True:
+        try:
+            data = conn.recv(4096)
             if not data:
                 break
+            print(f"收到来自 {addr} 的填写内容: {data.decode('utf-8')}")
+        except ConnectionResetError:
+            break
 
-            request = json.loads(data.decode("utf-8"))
-            action = request.get("action")
-            params = request.get("params", {})
+    conn.close()
+    print(f"客户端 {addr} 已断开")
 
-            if action == "login":
-                user_id = params.get("user_id")
-                print(f"[DEBUG] 用户 {user_id} 尝试登录")
-
-                with lock:
-                    if user_id in active_users:
-                        old_conn = active_users[user_id]
-                        try:
-                            print(f"[DEBUG] 用户 {user_id} 已登录，发送强制下线")
-                            old_conn.sendall(json.dumps({"action": "force_logout"}).encode("utf-8"))
-                        except Exception as e:
-                            print(f"[DEBUG] 发送强制下线失败: {e}")
-
-                    active_users[user_id] = conn
-                    print(f"[DEBUG] 用户 {user_id} 登录成功，保存连接")
-                # 这里不用 break，保持循环接收
-
-            else:
-                # 调用 db_utils 的函数
-                if not hasattr(__import__("db_utils"), action):
-                    response = {"error": f"Unknown action: {action}"}
-                else:
-                    func = getattr(__import__("db_utils"), action)
-                    try:
-                        result = func(**params)
-                        response = {"result": result}
-                    except Exception as e:
-                        response = {"error": str(e)}
-
-                conn.sendall(json.dumps(response).encode("utf-8"))
-
-    except Exception as e:
-        print(f"[DEBUG] 异常: {e}")
-
-    finally:
-        with lock:
-            if user_id and active_users.get(user_id) == conn:
-                del active_users[user_id]
-        print(f"[DEBUG] 关闭连接: {addr}")
-        conn.close()
 
 def start_server():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((HOST, PORT))
-        s.listen()
-        print(f"[服务启动] Listening on {HOST}:{PORT} ...")
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((HOST, PORT))
+    server.listen(10)
+    print(f"服务器启动，等待客户端连接...  ({HOST}:{PORT})")
 
-        while True:
-            conn, addr = s.accept()
-            print(f"[DEBUG] 新客户端连接: {addr}")
-            thread = threading.Thread(target=handle_client, args=(conn, addr))
-            thread.start()
+    while True:
+        conn, addr = server.accept()
+        thread = threading.Thread(target=handle_client, args=(conn, addr))
+        thread.start()
+
 
 if __name__ == "__main__":
     start_server()
