@@ -75,8 +75,7 @@ class DashboardView(tk.Frame):
         # ✅ 打开填写问卷的 MainWindow
         FillSurveyMainWindow(self.master, self.user_id)
 
-        # ✅ 关闭当前 Dashboard 界面
-        self.destroy()
+
 
     def open_editor(self):
         """点击按钮，跳转到 A 的问卷创建界面"""
