@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from module_a.ui_editor import SurveyEditorWindow  # 导入 A 的编辑器
+from module_b.fill_survey_gui import MainWindow as FillSurveyMainWindow
 
 
 class DashboardView(tk.Frame):
@@ -33,24 +34,49 @@ class DashboardView(tk.Frame):
         self.bottom_bar.pack_propagate(False)  # 禁止自动压缩高度
 
         # ============================================
-        # 3. 底部中心的创建按钮
+        # 3. 底部中心的两个按钮（创建问卷 + 填写问卷）
         # ============================================
-        # 创建一个显眼的按钮
+
+        # 左侧：填写问卷按钮 ✅
+        self.fill_btn = tk.Button(
+            self.bottom_bar,
+            text="✍ 填写问卷",
+            font=("Arial", 14, "bold"),
+            bg="#2196F3",  # 蓝色
+            fg="white",
+            activebackground="#1e88e5",
+            activeforeground="white",
+            relief="raised",
+            cursor="hand2",
+            command=self.open_fill_survey  # ✅ 新增方法
+        )
+
+        # 右侧：创建问卷按钮（你原来的）
         self.create_btn = tk.Button(
             self.bottom_bar,
             text="＋ 创建问卷",
             font=("Arial", 14, "bold"),
-            bg="#4CAF50",  # 绿色，非常显眼
-            fg="white",  # 白字
-            activebackground="#45a049",  # 点击时的颜色
+            bg="#4CAF50",
+            fg="white",
+            activebackground="#45a049",
             activeforeground="white",
             relief="raised",
-            cursor="hand2",  # 鼠标放上去变小手
-            command=self.open_editor  # 点击跳转
+            cursor="hand2",
+            command=self.open_editor
         )
 
-        # 将按钮居中放置
-        self.create_btn.place(relx=0.5, rely=0.5, anchor="center", width=150, height=50)
+        # ✅ 左右对称放置
+        self.fill_btn.place(relx=0.35, rely=0.5, anchor="center", width=150, height=50)
+        self.create_btn.place(relx=0.65, rely=0.5, anchor="center", width=150, height=50)
+
+    def open_fill_survey(self):
+        """点击填写问卷 → 打开填写问卷主界面，并关闭当前面板"""
+
+        # ✅ 打开填写问卷的 MainWindow
+        FillSurveyMainWindow(self.master, self.user_id)
+
+        # ✅ 关闭当前 Dashboard 界面
+        self.destroy()
 
     def open_editor(self):
         """点击按钮，跳转到 A 的问卷创建界面"""
