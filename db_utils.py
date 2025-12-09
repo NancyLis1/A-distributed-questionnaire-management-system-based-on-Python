@@ -453,6 +453,24 @@ def get_surveys_filled_by_user(user_id: int):
     return [r["survey_id"] for r in rows]
 
 
+
+def has_user_answered_survey(user_id: int, survey_id: int) -> bool:
+    """
+    检查指定用户是否已经填写过指定问卷。
+    用于 B 模块在网络端防止用户重复提交。
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    sql = "SELECT 1 FROM Answer_survey_history WHERE user_id = ? AND survey_id = ? LIMIT 1"
+    cursor.execute(sql, (user_id, survey_id))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return row is not None
+
+
 # -----------------------------
 # 违规管理 - 查询接口 (供 管理员界面/C模块 使用)
 # -----------------------------
