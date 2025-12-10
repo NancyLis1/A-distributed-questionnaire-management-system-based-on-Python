@@ -1,13 +1,14 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-# 引入后端接口
+# 引入后端接口 (已移除 sqlite3，新增 copy_question 和 get_question_options)
 from db_utils import (
     add_survey, add_question, add_option,
     get_full_survey_detail, update_survey_title,
     update_question_text, update_option_text,
     delete_question, delete_option, delete_survey,
-    add_violation, update_survey_status, publish_survey
+    add_violation, update_survey_status, publish_survey,
+    copy_question, get_question_options  # <--- 新增的两个接口
 )
 # 引入违规检测
 from module_a.violation_checker import ViolationChecker
@@ -70,6 +71,17 @@ class QuestionWidget(tk.Frame):
         top.lift()
         top.focus_force()
 
+    def get_type_name(self):
+        """获取题型的中文显示名称"""
+        type_map = {
+            "choice": "单选题",
+            "radio": "单选题",
+            "checkbox": "多选题",
+            "text": "填空题",
+            "slider": "滑动条"
+        }
+        return type_map.get(self.q_type, "未知题型")
+
     def create_ui(self):
         # --- 第一行：标题编辑区 ---
         header_frame = tk.Frame(self, bg="white")
@@ -110,7 +122,11 @@ class QuestionWidget(tk.Frame):
         tool_frame = tk.Frame(self, bg="white", height=40)
         tool_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        tk.Label(tool_frame, text="⚙ 题目设置", fg="gray", bg="white").pack(side=tk.LEFT)
+        # 显示中文题型标签
+        tk.Label(tool_frame, text=f"【{self.get_type_name()}】", fg="#2196F3", bg="white",
+                 font=("Arial", 10, "bold")).pack(side=tk.LEFT)
+        tk.Label(tool_frame, text="⚙ 设置", fg="gray", bg="white", font=("Arial", 10)).pack(side=tk.LEFT, padx=8)
+
         tk.Button(tool_frame, text="完成编辑", bg="#2196F3", fg="white", command=self.save_all).pack(side=tk.RIGHT,
                                                                                                      padx=5)
         tk.Label(tool_frame, text="•••", fg="gray", bg="white", font=("Arial", 14)).pack(side=tk.RIGHT, padx=5)
@@ -138,16 +154,12 @@ class QuestionWidget(tk.Frame):
             tk.Label(scale_nums, text=str(i), bg="white", fg="gray").pack(side=tk.LEFT, expand=True)
 
     def load_options(self):
+        """【修改】不再直接连接数据库，而是调用 db_utils"""
         for widget in self.options_container.winfo_children():
             widget.destroy()
 
-        import sqlite3
-        conn = sqlite3.connect("database/survey_system.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT option_id, option_text FROM Option WHERE question_id = ? ORDER BY option_index",
-                       (self.q_id,))
-        rows = cursor.fetchall()
-        conn.close()
+        # 调用接口获取 (id, text) 列表
+        rows = get_question_options(self.q_id)
 
         for opt_id, opt_text in rows:
             self.create_option_row(opt_id, opt_text)
@@ -217,33 +229,13 @@ class QuestionWidget(tk.Frame):
             self._refocus()
 
     def copy_me(self):
-        import sqlite3
-        conn = sqlite3.connect("database/survey_system.db")
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT MAX(question_index) FROM Question WHERE survey_id = ?", (self.survey_id,))
-        row = cursor.fetchone()
-        max_index = row[0] if row[0] is not None else 0
-        new_index = max_index + 1
-
-        new_text = self.title_entry.get()
-        cursor.execute('''
-            INSERT INTO Question (survey_id, question_index, question_text, question_type)
-            VALUES (?, ?, ?, ?)
-        ''', (self.survey_id, new_index, new_text, self.q_type))
-        new_q_id = cursor.lastrowid
-
-        cursor.execute("SELECT option_text FROM Option WHERE question_id = ? ORDER BY option_index", (self.q_id,))
-        opts = cursor.fetchall()
-        for idx, (txt,) in enumerate(opts, 1):
-            cursor.execute('''
-                INSERT INTO Option (question_id, option_index, option_text)
-                VALUES (?, ?, ?, ?)
-            ''', (new_q_id, idx, txt))
-
-        conn.commit()
-        conn.close()
-        self.refresh_callback(scroll_action='bottom')
+        """【修改】不再手动写 SQL，调用封装好的 copy_question"""
+        try:
+            copy_question(self.survey_id, self.q_id)
+            self.refresh_callback(scroll_action='bottom')
+        except Exception as e:
+            messagebox.showerror("错误", f"复制失败: {str(e)}", parent=self)
+            self._refocus()
 
     def save_all(self):
         self.save_title()
@@ -472,19 +464,30 @@ class SurveyEditorWindow(tk.Toplevel):
             self.after(50, lambda: self.scroll_area.canvas.yview_moveto(saved_y))
 
     def add_question_directly(self, q_type):
+        """直接添加题目"""
         data = get_full_survey_detail(self.survey_id)
         new_index = len(data['questions']) + 1
 
+        # 1. 在字典里增加 slider 的默认标题
         default_titles = {
-            "choice": "单选题", "checkbox": "多选题",
-            "text": "填空题", "slider": "评分 (1-10)"
+            "choice": "单选题",
+            "checkbox": "多选题",
+            "text": "填空题",
+            "slider": "评分题 (1-10)"  # <--- 新增默认标题
         }
+
+        # 2. 插入问题 (数据库中 type 字段将被存为 'slider')
         q_id = add_question(self.survey_id, new_index, default_titles[q_type], q_type)
 
+        # 3. 处理选项逻辑
         if q_type in ["choice", "checkbox"]:
+            # 普通选择题：默认给两个选项
             add_option(q_id, 1, "选项1")
             add_option(q_id, 2, "选项2")
+
         elif q_type == "slider":
+            # 【核心修改】滑动条：自动生成 1 到 10 的选项
+            # 这样成员 B 获取 get_full_survey_detail 时，options 列表里就是 ["1", "2", ..., "10"]
             for i in range(1, 11):
                 add_option(q_id, i, str(i))
 

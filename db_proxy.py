@@ -51,6 +51,7 @@ def get_surveys_filled_by_user(sock, user_id: int) -> List[int]:
 def has_user_answered_survey(sock, user_id: int, survey_id: int) -> bool:
     return send_request("has_user_answered_survey", {"user_id": user_id, "survey_id": survey_id}, sock=sock)
 
+
 # ==============================
 # 问题和选项相关接口
 # ==============================
@@ -67,6 +68,17 @@ def add_option(sock, question_id: int, option_index: int, option_text: str) -> i
         "question_id": question_id,
         "option_index": option_index,
         "option_text": option_text
+    }, sock=sock)
+
+# 【新增】获取指定题目的选项列表 (供编辑器使用)
+def get_question_options(sock, question_id: int) -> List[Any]:
+    return send_request("get_question_options", {"question_id": question_id}, sock=sock)
+
+# 【新增】复制题目 (供编辑器使用)
+def copy_question(sock, survey_id: int, source_question_id: int):
+    return send_request("copy_question", {
+        "survey_id": survey_id,
+        "source_question_id": source_question_id
     }, sock=sock)
 
 def add_answer(sock, user_id: int, survey_id: int, question_id: int, answer_content: str) -> int:

@@ -527,6 +527,18 @@ def get_all_violations() -> List[Dict[str, Any]]:
         result.append(dict(row))
     return result
 
+def get_question_options(question_id: int) -> List[tuple]:
+    """
+    获取指定题目的所有选项，返回 [(option_id, option_text), ...]
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    # 只需要 ID 和 文本，按 index 排序
+    cursor.execute("SELECT option_id, option_text FROM Option WHERE question_id = ? ORDER BY option_index", (question_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
 
 # ==========================================
 # CRUD实现：Update (更新) & Delete (删除) 接口
@@ -602,12 +614,41 @@ def update_option_text(option_id: int, new_text: str):
 # 3. 问卷编辑 (删除题目/选项)
 # -----------------------------
 
+# db_utils.py
+
 def delete_question(question_id: int):
     """
-    删除单个问题 (级联删除该问题的选项和对应的答案)
+    删除单个问题，并自动重排后续题目的序号
     """
-    sql = "DELETE FROM Question WHERE question_id = ?"
-    execute(sql, (question_id,))
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    try:
+        # 1. 先查出要删除题目的 survey_id 和 question_index
+        cursor.execute("SELECT survey_id, question_index FROM Question WHERE question_id = ?", (question_id,))
+        row = cursor.fetchone()
+        if not row:
+            return  # 题目不存在，直接返回
+
+        survey_id, deleted_index = row
+
+        # 2. 删除题目 (级联删除选项)
+        cursor.execute("DELETE FROM Question WHERE question_id = ?", (question_id,))
+
+        # 3. 【核心新增】重排后续题目：将所有 index > deleted_index 的题目，index 减 1
+        cursor.execute('''
+            UPDATE Question 
+            SET question_index = question_index - 1 
+            WHERE survey_id = ? AND question_index > ?
+        ''', (survey_id, deleted_index))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 def delete_option(option_id: int):
     """
@@ -615,3 +656,54 @@ def delete_option(option_id: int):
     """
     sql = "DELETE FROM Option WHERE option_id = ?"
     execute(sql, (option_id,))
+
+
+# db_utils.py
+
+def copy_question(survey_id: int, source_question_id: int):
+    """
+    深度复制一个题目（包括其所有选项），自动计算新序号
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    try:
+        # 1. 获取源题目信息
+        cursor.execute("SELECT question_text, question_type FROM Question WHERE question_id = ?", (source_question_id,))
+        q_row = cursor.fetchone()
+        if not q_row:
+            raise ValueError("源题目不存在")
+        q_text, q_type = q_row
+
+        # 2. 计算新 Index (Max + 1)
+        cursor.execute("SELECT MAX(question_index) FROM Question WHERE survey_id = ?", (survey_id,))
+        row = cursor.fetchone()
+        max_index = row[0] if row[0] is not None else 0
+        new_index = max_index + 1
+
+        # 3. 插入新题目
+        cursor.execute('''
+            INSERT INTO Question (survey_id, question_index, question_text, question_type)
+            VALUES (?, ?, ?, ?)
+        ''', (survey_id, new_index, q_text, q_type))
+        new_q_id = cursor.lastrowid
+
+        # 4. 复制选项
+        cursor.execute("SELECT option_text FROM Option WHERE question_id = ? ORDER BY option_index",
+                       (source_question_id,))
+        opts = cursor.fetchall()
+
+        for idx, (opt_text,) in enumerate(opts, 1):
+            # 【修复点】：这里只能有 3 个问号，对应 3 个字段
+            cursor.execute('''
+                INSERT INTO Option (question_id, option_index, option_text)
+                VALUES (?, ?, ?)
+            ''', (new_q_id, idx, opt_text))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
