@@ -124,7 +124,7 @@ class QuestionWidget(tk.Frame):
         frame = tk.Frame(self.options_container, bg="white")
         frame.pack(fill=tk.X, pady=10)
 
-        val_label = tk.Label(frame, text="5", font=("Arial", 14, "bold"), bg="white", width=3, bd=1, relief="solid")
+        val_label = tk.Label(frame, text=" ", font=("Arial", 14, "bold"), bg="white", width=3, bd=1, relief="solid")
         val_label.pack(side=tk.LEFT, padx=10)
 
         scale = tk.Scale(frame, from_=1, to=10, orient=tk.HORIZONTAL,
