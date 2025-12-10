@@ -7,7 +7,7 @@ import sys
 import os
 from typing import List, Dict, Any, Optional
 
-# 让程序能找到根目录的 db_utils.py
+# 让程序能找到根目录的 db_proxy.py
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import db_proxy as db
 
@@ -558,6 +558,39 @@ class FillSurveyWindow:
             entry = ttk.Entry(q_frame, width=50)
             entry.pack(anchor="w")
             self.answer_widgets[qid] = entry
+        elif q["type"] == "slider":
+            # 创建滑块和值显示标签
+            slider_frame = tk.Frame(q_frame)
+            slider_frame.pack(fill="x", pady=5)
+
+            # 值显示标签
+            val_label = tk.Label(slider_frame, text="5", font=("Arial", 12, "bold"),
+                                 width=3, bd=1, relief="solid")
+            val_label.pack(side="left", padx=(0, 10))
+
+            # 创建滑块 (1-10)
+            scale = tk.Scale(slider_frame, from_=1, to=10, orient=tk.HORIZONTAL,
+                             length=300, showvalue=0)
+            scale.set(5)  # 默认值为5
+            scale.pack(side="left", fill="x", expand=True)
+
+            # 创建数字标签
+            scale_nums = tk.Frame(q_frame, bg="white")
+            scale_nums.pack(fill="x", padx=55, pady=5)
+            for i in range(1, 11):
+                tk.Label(scale_nums, text=str(i), bg="white", fg="gray").pack(side="left", expand=True)
+
+            # 存储滑块和标签的引用
+            self.answer_widgets[qid] = {
+                'scale': scale,
+                'value_label': val_label
+            }
+
+            # 绑定滑块值变化事件
+            def update_label(val, label=val_label):
+                label.config(text=str(int(float(val))))
+
+            scale.config(command=update_label)
 
     def back_to_main(self, skip_confirm=False):
         """
@@ -596,6 +629,11 @@ class FillSurveyWindow:
                     messagebox.showwarning("未完成", f"第 {q['index']} 题尚未填写（文本题）。")
                     return
                 ans = widget.get().strip()
+                # 新增：滑动条校验
+            elif q["type"] == "slider":
+                # 滑动条总是有值（默认值为5），所以不需要校验是否为空
+                ans = str(widget['scale'].get())
+
             is_bad, bad_word = self.violation_checker.check_text(ans)
             if is_bad:
                 messagebox.showerror("违规内容", f"第 {q['index']} 题答案包含敏感词【{bad_word}】\n请修改后再提交。")
@@ -620,8 +658,11 @@ class FillSurveyWindow:
                     ans = widget.get()
                 elif q["type"] == "checkbox":
                     ans = ",".join(opt for opt, v in widget if v.get())
-                else:
+                elif q["type"] == "text":
                     ans = widget.get().strip()
+                    # 新增：滑动条答案获取
+                elif q["type"] == "slider":
+                    ans = str(widget['scale'].get())
 
                 # 整理成新接口需要的格式
                 answers_to_submit.append({'question_id': qid, 'answer_text': ans})
