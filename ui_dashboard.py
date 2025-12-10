@@ -1,7 +1,7 @@
 # ui_dashboard.py
 import tkinter as tk
 from tkinter import messagebox
-from module_a.ui_editor import SurveyEditorWindow  # 导入 A 的编辑器
+from module_a.ui_editor_treading import SurveyEditorWindow  # 导入 A 的编辑器
 from module_b.fill_survey_gui_treading import MainWindow as FillSurveyMainWindow
 
 
