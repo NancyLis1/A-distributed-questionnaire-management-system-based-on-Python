@@ -2,14 +2,15 @@
 import tkinter as tk
 from tkinter import messagebox
 from module_a.ui_editor import SurveyEditorWindow  # 导入 A 的编辑器
-from module_b.fill_survey_gui import MainWindow as FillSurveyMainWindow
+from module_b.fill_survey_gui_treading import MainWindow as FillSurveyMainWindow
 
 
 class DashboardView(tk.Frame):
-    def __init__(self, master, user_id):
+    def __init__(self, master, user_id,sock =None):
         super().__init__(master)
         self.master = master
         self.user_id = user_id
+        self.sock = sock
 
         # 背景色（方便区分区域）
         self.configure(bg="#F0F0F0")
@@ -71,9 +72,8 @@ class DashboardView(tk.Frame):
 
     def open_fill_survey(self):
         """点击填写问卷 → 打开填写问卷主界面，并关闭当前面板"""
-
         # ✅ 打开填写问卷的 MainWindow
-        FillSurveyMainWindow(self.master, self.user_id)
+        FillSurveyMainWindow(self.master, self.user_id,self.sock)
 
 
 

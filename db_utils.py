@@ -5,8 +5,13 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import hashlib
 
-DB_PATH = "database/survey_system.db"
+import os
 
+# 获取当前脚本所在目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 数据库绝对路径
+DB_PATH = os.path.join(BASE_DIR, "database", "survey_system.db")
 # -----------------------------
 # 通用执行函数
 # -----------------------------
@@ -151,6 +156,35 @@ def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: s
     conn.commit()
     conn.close()
     return ans_id
+
+
+def add_full_survey_submission(user_id: int, survey_id: int, answers: List[Dict[str, Any]]):
+    """
+    服务器端逻辑：一次性处理问卷历史记录和所有问题答案的提交。
+
+    这是通过一个网络请求，在服务器内部执行多次数据库操作。
+
+    :param user_id: 提交问卷的用户ID
+    :param survey_id: 问卷ID
+    :param answers: 答案列表，格式为 [{'question_id': qid, 'answer_text': ans}, ...]
+    :return: True 表示提交成功
+    """
+
+    # 1. 记录问卷填写历史 (假设您已有的函数，它不接受 sock 参数)
+    # 如果该函数在您的 db_utils.py 中需要自行处理 DB 连接和事务，请在这里处理
+    add_answer_survey_history(user_id, survey_id)
+
+    # 2. 循环提交所有问题答案 (使用服务器的本地数据库操作)
+    for answer_data in answers:
+        question_id = answer_data.get('question_id')
+        answer_text = answer_data.get('answer_text')
+
+        if question_id is not None and answer_text is not None:
+            # 假设您已有的函数
+            add_answer(user_id, survey_id, question_id, answer_text)
+
+    # 如果上述函数执行无误，则返回成功
+    return True
 
 # -----------------------------
 # 7.违规管理 - 写入接口 (供 Manager 使用)
@@ -451,24 +485,6 @@ def get_surveys_filled_by_user(user_id: int):
     conn.close()
 
     return [r["survey_id"] for r in rows]
-
-
-def has_user_answered_survey(user_id: int, survey_id: int) -> bool:
-    """
-    检查指定用户是否已经填写过指定问卷。
-    用于 B 模块在网络端防止用户重复提交。
-    """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    sql = "SELECT 1 FROM Answer_survey_history WHERE user_id = ? AND survey_id = ? LIMIT 1"
-    cursor.execute(sql, (user_id, survey_id))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    return row is not None
-
 
 
 # -----------------------------
