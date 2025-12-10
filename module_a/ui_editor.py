@@ -403,7 +403,7 @@ class SurveyEditorWindow(tk.Toplevel):
         for idx, (label, q_type) in enumerate(basic_types):
             row = idx // 2
             col = idx % 2
-            # 增大 width 和 pady，字体加粗
+
             btn = tk.Button(basic_frame, text=label, font=("Arial", 11), bg="#F5F5F5", bd=0,
                             pady=12, width=18, cursor="hand2",
                             command=lambda t=q_type: self.add_question_directly(t))
