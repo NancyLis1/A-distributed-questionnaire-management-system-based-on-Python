@@ -14,7 +14,7 @@ def main():
     root.resizable(False, False)  # 建议固定大小，防止布局错乱
 
     # 3. 模拟当前登录用户 (实际应从登录界面传过来)
-    current_user_id = 2
+    current_user_id = 1
 
     # 4. 加载主面板 (Dashboard)
     app = DashboardView(root, current_user_id)
