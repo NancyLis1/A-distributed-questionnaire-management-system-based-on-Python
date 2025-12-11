@@ -707,3 +707,60 @@ def copy_question(survey_id: int, source_question_id: int):
         raise e
     finally:
         conn.close()
+
+
+def undo_survey_submission(user_id: int, survey_id: int):
+    """
+    清除指定用户对指定问卷的提交记录。
+
+    此函数用于客户端发生网络超时时调用，尝试清理数据库中可能已经存入但客户端未收到确认的记录，
+    以保证数据的最终一致性：要么数据存在且客户端已知，要么数据完全被删除。
+
+    :param user_id: 用户的ID
+    :param survey_id: 问卷的ID
+    :return: None
+    """
+    # 假设 DB_CONN 是全局可用的数据库连接对象
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    try:
+        # 1. 查找最近的、由该用户提交的、针对该问卷的记录
+        # 注意：由于网络问题可能导致重复提交，我们删除所有匹配的记录以确保清理干净。
+
+        # 查找所有待删除的 history_id
+        cursor.execute("""
+            SELECT history_id FROM survey_history 
+            WHERE user_id = ? AND survey_id = ?
+            ORDER BY submission_time DESC;
+        """, (user_id, survey_id))
+
+        history_ids_to_delete = [row[0] for row in cursor.fetchall()]
+
+        if not history_ids_to_delete:
+            # 没有找到记录，直接返回
+            return True
+
+        # 2. 删除 answers 表中与这些 history_id 相关的所有答案
+        # 使用 IN 语句进行批量删除
+        placeholders = ','.join('?' for _ in history_ids_to_delete)
+        cursor.execute(f"""
+            DELETE FROM answers 
+            WHERE history_id IN ({placeholders});
+        """, history_ids_to_delete)
+
+        # 3. 删除 survey_history 表中对应的记录
+        cursor.execute(f"""
+            DELETE FROM survey_history 
+            WHERE history_id IN ({placeholders});
+        """, history_ids_to_delete)
+
+        # 4. 提交事务，确保删除生效
+        conn.commit()
+        return True  # 清理成功
+
+    except Exception as e:
+        # 发生错误时，回滚事务
+        conn.rollback()
+        # 重新抛出异常，让服务器端知道清理失败
+        raise Exception(f"数据库清理失败: {e}")

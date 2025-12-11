@@ -7,14 +7,14 @@ SERVER_HOST = "127.0.0.1"  # 服务端地址
 SERVER_PORT = 5000  # 服务端端口
 
 
-def send_request(action: str, params: dict = None, sock=None, timeout: float = 10.0):
+def send_request(action: str, params: dict = None, sock=None, timeout: float = 5.0):
     """
     发送请求到服务器，并等待响应。
 
     :param action: 请求的动作名称
     :param params: 请求参数字典
     :param sock: 已连接的 socket（必须传入）
-    :param timeout: 接收超时时间（秒）。已从 5.0 增加到 10.0。
+    :param timeout: 接收超时时间（秒）。。
     """
     if sock is None:
         raise Exception("必须传入登录 socket")
@@ -36,7 +36,7 @@ def send_request(action: str, params: dict = None, sock=None, timeout: float = 1
 
     except socket.timeout:
         # 抛出具体的超时错误信息
-        raise Exception("网络超时 (10秒限制)：接收服务器响应超时，请检查服务器是否正常。")
+        raise Exception("网络超时 (5秒限制)：接收服务器响应超时，请检查服务器是否正常。")
     except Exception as e:
         raise Exception(f"网络错误：发送或接收数据出错: {e}")
 

@@ -80,4 +80,4 @@ class DashboardView(tk.Frame):
     def open_editor(self):
         """点击按钮，跳转到 A 的问卷创建界面"""
         # 使用 Toplevel 打开新窗口，保持 root 存在
-        SurveyEditorWindow(self.master, self.user_id)
+        SurveyEditorWindow(self.master, self.user_id,self.sock)

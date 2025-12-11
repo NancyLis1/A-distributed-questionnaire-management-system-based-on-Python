@@ -271,9 +271,14 @@ class MainWindow:
             self.loading_overlay.destroy()
             self.loading_overlay = None
 
+    # 🚀 新增：判断是否为网络错误
+    def is_network_error(self, message: str) -> bool:
+        """检查错误信息是否包含瞬时网络错误关键词"""
+        return "网络超时" in message or "网络错误" in message or "连接已关闭" in message or "接收服务器响应超时" in message
+
     def _handle_error(self, message):
         self.hide_loading_state()
-        messagebox.showerror("网络错误", message)
+        messagebox.showerror("操作失败", message, parent=self.win)
 
     def refresh(self):
         # 清除旧的列表项
@@ -323,7 +328,12 @@ class MainWindow:
             self.win.after(0, self._update_gui_with_data, surveys, filled_surveys)
 
         except Exception as e:
-            self.win.after(0, self._handle_error, f"刷新列表失败: {e}")
+            error_message = f"刷新列表失败: {e}"
+            if self.is_network_error(error_message):
+                # 🚀 自动刷新，不弹窗，重新尝试加载
+                self.win.after(0, self.refresh)
+            else:
+                self.win.after(0, self._handle_error, error_message)
 
     # =======================================================
     # 一次性绘制所有问卷列表
@@ -386,7 +396,7 @@ class MainWindow:
         value = self.search_entry.get().strip()
         mode = self.search_mode.get()
         if value == "":
-            messagebox.showwarning("提示", "请输入搜索内容")
+            messagebox.showwarning("提示", "请输入搜索内容", parent=self.win)
             return
         self.filter_value = value
         if mode == "按问卷ID":
@@ -469,9 +479,20 @@ class FillSurveyWindow:
             self.loading_overlay.destroy()
             self.loading_overlay = None
 
-    def _handle_error(self, message):
+    def is_network_error(self, message: str) -> bool:
+        """检查错误信息是否包含瞬时网络错误关键词"""
+        return "网络超时" in message or "网络错误" in message or "连接已关闭" in message or "接收服务器响应超时" in message
+
+    def _handle_error(self, message, is_fatal=False):
         self.hide_loading_state()
-        messagebox.showerror("网络错误", message)
+        messagebox.showerror("操作失败", message, parent=self.win)
+        if is_fatal:
+            self.back_to_main(skip_confirm=True)
+
+    def _handle_loading_network_failure(self):
+        """处理加载问卷时的网络错误：直接返回主界面并刷新"""
+        self.hide_loading_state()
+        messagebox.showinfo("提示", "网络连接异常，已自动刷新问卷列表。", parent=self.win)
         self.back_to_main(skip_confirm=True)
 
     def _load_survey_data(self):
@@ -479,7 +500,13 @@ class FillSurveyWindow:
             survey_data = db.get_full_survey_detail(self.sock, self.survey_id)
             self.win.after(0, self._build_ui, survey_data)
         except Exception as e:
-            self.win.after(0, self._handle_error, f"获取问卷详情失败: {e}")
+            error_message = f"获取问卷详情失败: {e}"
+            if self.is_network_error(error_message):
+                # 🚀 网络错误，自动返回并刷新主列表
+                self.win.after(0, self._handle_loading_network_failure)
+            else:
+                # 其他错误（如问卷不存在），弹窗并返回主列表
+                self.win.after(0, self._handle_error, error_message, is_fatal=True)
 
     def _build_ui(self, survey_data):
         self.hide_loading_state()
@@ -615,18 +642,18 @@ class FillSurveyWindow:
             ans = ""
             if q["type"] in ("choice", "radio"):
                 if widget.get() == "":
-                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未作答（单选题）。")
+                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未作答（单选题）。", parent=self.win)
                     return
                 ans = widget.get()
             elif q["type"] == "checkbox":
                 selected = [opt for opt, v in widget if v.get()]
                 if len(selected) == 0:
-                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未作答（多选题）。")
+                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未作答（多选题）。", parent=self.win)
                     return
                 ans = ",".join(selected)
             elif q["type"] == "text":
                 if widget.get().strip() == "":
-                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未填写（文本题）。")
+                    messagebox.showwarning("未完成", f"第 {q['index']} 题尚未填写（文本题）。", parent=self.win)
                     return
                 ans = widget.get().strip()
                 # 新增：滑动条校验
@@ -636,7 +663,8 @@ class FillSurveyWindow:
 
             is_bad, bad_word = self.violation_checker.check_text(ans)
             if is_bad:
-                messagebox.showerror("违规内容", f"第 {q['index']} 题答案包含敏感词【{bad_word}】\n请修改后再提交。")
+                messagebox.showerror("违规内容", f"第 {q['index']} 题答案包含敏感词【{bad_word}】\n请修改后再提交。",
+                                     parent=self.win)
                 return
 
         # 2. 禁用按钮，显示加载状态
@@ -680,22 +708,50 @@ class FillSurveyWindow:
 
         except Exception as e:
             # 4. 失败后返回主线程处理 UI
-            self.win.after(0, self._submission_failure, f"提交答案失败: {e}")
+            error_message = f"提交答案失败: {e}"
+            cleanup_successful = False
+
+            if self.is_network_error(error_message):
+                try:
+                    # 尝试清除数据库中的记录（即“回滚”）
+                    db.undo_survey_submission(self.sock, self.user_id, self.survey_id)
+                    cleanup_successful = True
+                except:
+                    # 清理操作本身也失败了，我们只能尽力了
+                    pass
+
+                # 4. 失败后返回主线程处理 UI
+            self.win.after(0, self._submission_failure_handler, error_message, cleanup_successful)
+
 
     def _submission_success(self):
         self.hide_loading_state()
-        messagebox.showinfo("成功", "问卷填写完成！",parent=self.win)
+        messagebox.showinfo("成功", "问卷填写完成！", parent=self.win)
         self.main_window.refresh()
         self.parent_win.deiconify()
         self.win.destroy()
 
-    def _submission_failure(self, message):
+    def _submission_failure_handler(self, message, cleanup_successful=False):
+        """处理提交问卷时的失败，如果是网络错误则重置按钮并根据清理结果给出提示"""
         self.hide_loading_state()
-        messagebox.showerror("提交失败", message)
-        # 恢复按钮状态，允许用户重试或返回
-        self.submit_btn.config(state="normal", bg="#2196F3", fg="white")  # 恢复颜色
+
+        # 重新启用按钮
+        self.submit_btn.config(state="normal", bg="#2196F3", fg="white")
         self.back_btn.config(state="normal", bg="#E0E0E0")
 
+        if self.is_network_error(message):
+            if cleanup_successful:
+                # 🚀 已经成功清除，用户可以重新填写
+                messagebox.showinfo("提交失败", "网络连接超时，已**成功清除**本次作答记录，请检查网络后重试。",
+                                    parent=self.win)
+            else:
+                # 🚀 清除失败，数据可能已存入，提示用户刷新主页查看
+                messagebox.showinfo("提交失败",
+                                    "网络连接不稳定，请稍后点击'提交问卷'按钮重试。（注意：由于网络原因，本次作答记录可能已部分存入，建议返回主页刷新查看问卷是否标记为'已填写'）",
+                                    parent=self.win)
+        else:
+            # 业务逻辑错误/其他：弹出错误
+            messagebox.showerror("提交失败", message, parent=self.win)
 
 # ---------------------------
 # 程序入口
