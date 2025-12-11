@@ -51,7 +51,8 @@ def get_surveys_filled_by_user(sock, user_id: int) -> List[int]:
 def has_user_answered_survey(sock, user_id: int, survey_id: int) -> bool:
     return send_request("has_user_answered_survey", {"user_id": user_id, "survey_id": survey_id}, sock=sock)
 
-
+def get_user_survey_answers_detail(sock, survey_id: int, user_id: int) -> List[Dict[str, Any]]:
+    return send_request("get_user_survey_answers_detail", {"survey_id": survey_id,"user_id": user_id}, sock=sock)
 # ==============================
 # 问题和选项相关接口
 # ==============================

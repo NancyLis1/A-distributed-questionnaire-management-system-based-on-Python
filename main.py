@@ -1,7 +1,7 @@
+
 # main.py
 import tkinter as tk
 from ui_dashboard import DashboardView
-
 
 def main():
     # 1. 创建唯一的根窗口

@@ -213,14 +213,14 @@ def add_violation(survey_id: int, reason: str, status: str = 'pending', handled_
 
 def get_user_by_login(identifier: str) -> Optional[Dict[str, Any]]:
     """
-    通过用户名 or 手机号登录（identifier）
+    通过用户名登录（identifier）
     """
     sql = """
-    SELECT user_id, user_name, phone, password_hash, user_status
+    SELECT user_id, user_name, password, user_status
     FROM User
-    WHERE user_name = ? OR phone = ?
+    WHERE user_name = ?
     """
-    res = execute(sql, (identifier, identifier), fetch=True)
+    res = execute(sql, (identifier, ), fetch=True)
     if not res:
         return None
 
@@ -228,9 +228,8 @@ def get_user_by_login(identifier: str) -> Optional[Dict[str, Any]]:
     return {
         "user_id": row[0],
         "user_name": row[1],
-        "phone": row[2],
-        "password_hash": row[3],
-        "user_status": row[4]
+        "password": row[2],
+        "user_status": row[3]
     }
 
 
@@ -274,6 +273,48 @@ def get_survey(survey_id: int) -> Optional[Dict[str, Any]]:
         "created_at": row["created_at"]
     }
 
+
+def get_user_survey_answers_detail(survey_id: int, user_id: int) -> List[Dict[str, Any]]:
+    """
+    【新增功能】获取指定用户对指定问卷的详细答案列表，用于在UI中显示。
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    result_list = []
+
+    # 获取该问卷下所有题目
+    cursor.execute("SELECT question_id, question_text FROM Question WHERE survey_id = ? ORDER BY question_index ASC",
+                   (survey_id,))
+    questions = cursor.fetchall()
+
+    for q in questions:
+        question_id = q["question_id"]
+
+        # 关键查询：只查询当前用户的答案
+        cursor.execute(
+            """
+            SELECT answer_content 
+            FROM Answer 
+            WHERE survey_id = ? AND question_id = ? AND user_id = ?
+            """,
+            (survey_id, question_id, user_id)
+        )
+        answer_row = cursor.fetchone()
+
+        # 检查答案是否存在
+        answer_content = answer_row["answer_content"] if answer_row and answer_row[
+            "answer_content"] is not None else "未作答"
+
+        result_list.append({
+            "question_text": q["question_text"],
+            "answer": answer_content
+        })
+
+    conn.close()
+    return result_list
 
 # -----------------------------
 # 核心查询函数 (供 B 模块使用)
