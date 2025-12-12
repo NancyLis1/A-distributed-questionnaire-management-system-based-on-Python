@@ -207,6 +207,41 @@ def add_violation(survey_id: int, reason: str, status: str = 'pending', handled_
     return violation_id
 
 
+def add_question_with_options(survey_id: int, question_index: int, question_text: str, question_type: str, options: list) -> int:
+    """
+    【原子操作】一次性添加题目和其所有选项。
+    :param options: 选项文本列表，如 ["男", "女"]
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+
+    try:
+        # 1. 插入题目
+        cursor.execute('''
+            INSERT INTO Question (survey_id, question_index, question_text, question_type)
+            VALUES (?, ?, ?, ?)
+        ''', (survey_id, question_index, question_text, question_type))
+        qid = cursor.lastrowid
+
+        # 2. 批量插入选项
+        # 选项列表格式：(question_id, option_index, option_text)
+        if options:
+            opt_data = [(qid, idx, text) for idx, text in enumerate(options, 1)]
+            cursor.executemany('''
+                INSERT INTO Option (question_id, option_index, option_text)
+                VALUES (?, ?, ?)
+            ''', opt_data)
+
+        conn.commit()
+        return qid
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
 # ==========================================
 # CRUD实现2：Read（读取）
 # ==========================================

@@ -30,6 +30,21 @@ def add_survey(sock, created_by: int, survey_title: str, survey_status: str = "d
         "release_time": release_time
     }, sock=sock)
 
+
+
+def add_question_with_options(sock, survey_id: int, question_index: int, question_text: str, question_type: str, options: list) -> int:
+    """
+    【原子操作】一次性发送题目和选项，将 N 次网络交互合并为 1 次。
+    解决创建题目卡顿和超时问题的核心。
+    """
+    return send_request("add_question_with_options", {
+        "survey_id": survey_id,
+        "question_index": question_index,
+        "question_text": question_text,
+        "question_type": question_type,
+        "options": options
+    }, sock=sock)
+
 def get_survey(sock, survey_id: int) -> Optional[Dict[str, Any]]:
     return send_request("get_survey", {"survey_id": survey_id}, sock=sock)
 
