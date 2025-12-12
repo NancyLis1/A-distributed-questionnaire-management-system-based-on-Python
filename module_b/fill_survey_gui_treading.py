@@ -706,23 +706,28 @@ class FillSurveyWindow:
             # 3. 成功后返回主线程处理 UI
             self.win.after(0, self._submission_success)
 
-        except Exception as e:
-            # 4. 失败后返回主线程处理 UI
-            error_message = f"提交答案失败: {e}"
-            cleanup_successful = False
 
+        except Exception as e:
+            error_message = str(e)
+            cleanup_successful = False
+            # 🌟 核心改动 1：主动检查数据库是否已成功写入
+            try:
+                filled = db.get_surveys_filled_by_user(self.sock, self.user_id)
+                if self.survey_id in filled:
+                    # 🎉 实际已经写入成功
+                    self.win.after(0, self._submission_success)
+                    return
+            except:
+                pass
+            # 🌟 核心改动 2：仍然作为网络错误处理，但不再误报数据未写入
             if self.is_network_error(error_message):
                 try:
-                    # 尝试清除数据库中的记录（即“回滚”）
-                    db.undo_survey_submission(self.sock, self.user_id, self.survey_id)
+                    db.undo_survey_submission(self.sock, self.user_id, self.survey_id, timeout=5.0)
                     cleanup_successful = True
                 except:
-                    # 清理操作本身也失败了，我们只能尽力了
                     pass
 
-                # 4. 失败后返回主线程处理 UI
             self.win.after(0, self._submission_failure_handler, error_message, cleanup_successful)
-
 
     def _submission_success(self):
         self.hide_loading_state()
