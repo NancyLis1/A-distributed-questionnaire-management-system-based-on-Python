@@ -33,7 +33,8 @@ def handle_client(conn, addr):
                         old_conn = active_users[user_id]
                         try:
                             print(f"[DEBUG] 用户 {user_id} 已登录，发送强制下线")
-                            old_conn.sendall(json.dumps({"action": "force_logout"}).encode("utf-8"))
+                            logout_msg = json.dumps({"action": "force_logout"}) + '\n'
+                            old_conn.sendall(logout_msg.encode("utf-8"))
                         except Exception as e:
                             print(f"[DEBUG] 发送强制下线失败: {e}")
 
@@ -53,7 +54,9 @@ def handle_client(conn, addr):
                     except Exception as e:
                         response = {"error": str(e)}
 
-                conn.sendall(json.dumps(response).encode("utf-8"))
+                # 🚀 修正：添加 \n 作为消息定界符
+                response_to_send = json.dumps(response) + '\n'
+                conn.sendall(response_to_send.encode("utf-8"))
 
     except Exception as e:
         print(f"[DEBUG] 异常: {e}")
