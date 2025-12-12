@@ -267,6 +267,12 @@ def get_user_by_login(identifier: str) -> Optional[Dict[str, Any]]:
         "user_status": row[3]
     }
 
+def get_username_by_id(user_id):
+    sql = "SELECT user_name FROM User WHERE user_id = ?"
+    res = execute(sql, (user_id,), fetch=True)
+    if res:
+        return res[0][0]
+    return None
 
 def get_user_id_by_name(user_name: str) -> Optional[int]:
     """根据用户名查找用户ID"""
