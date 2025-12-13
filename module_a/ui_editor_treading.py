@@ -1,7 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
-import time
+import socket
+
+# 引入配置
+from module_b.client_socket import SERVER_HOST, SERVER_PORT
 
 # 引入网络代理接口
 from db_proxy import (
@@ -61,10 +64,10 @@ class ScrollableFrame(tk.Frame):
 
 
 # ============================================================================
-# 2. 核心组件：单题编辑器 Widget (修复模板选项无法删除问题)
+# 2. 核心组件：单题编辑器 Widget
 # ============================================================================
 class QuestionWidget(tk.Frame):
-    def __init__(self, master, question_data, survey_id, refresh_callback, checker, sock):
+    def __init__(self, master, question_data, survey_id, refresh_callback, checker, sock, append_callback=None):
         super().__init__(master, bg="white", bd=1, relief="solid")
         self.pack(fill=tk.X, padx=10, pady=10)
 
@@ -72,20 +75,20 @@ class QuestionWidget(tk.Frame):
         self.q_data = question_data
         self.survey_id = survey_id
         self.refresh_callback = refresh_callback
+        self.append_callback = append_callback
         self.checker = checker
         self.q_id = question_data['question_id']
         self.q_type = question_data['type']
 
-        self._busy = False
         self.index_label = None
-
         self.create_ui()
 
     def _refocus(self):
         try:
-            top = self.winfo_toplevel()
-            top.lift()
-            top.focus_force()
+            if self.winfo_toplevel().winfo_exists():
+                top = self.winfo_toplevel()
+                top.lift()
+                top.focus_force()
         except:
             pass
 
@@ -94,11 +97,10 @@ class QuestionWidget(tk.Frame):
         return type_map.get(self.q_type, "未知题型")
 
     def update_index_label(self, new_index):
-        if self.index_label:
+        if self.index_label and self.winfo_exists():
             self.index_label.config(text=f"{new_index}.")
         self.q_data['index'] = new_index
 
-    # ------------------ 通用线程执行器 ------------------
     def run_thread(self, target_func, callback=None):
         def worker():
             try:
@@ -106,8 +108,7 @@ class QuestionWidget(tk.Frame):
                 if callback:
                     self.after(0, lambda: callback(res))
             except Exception as e:
-                # 静默处理后台错误，避免弹窗打断用户
-                print(f"[QuestionWidget Bg Error]: {e}")
+                print(f"[Bg Error]: {e}")
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -130,14 +131,10 @@ class QuestionWidget(tk.Frame):
         if self.q_type == 'slider':
             self.render_slider_preview()
         elif self.q_type in ["choice", "radio", "checkbox"]:
-            # 【核心修复】：处理模板题目的选项
             if 'options' in self.q_data and self.q_data['options']:
-                # 1. 先把文字画出来（乐观渲染），让用户立刻看到
                 for opt_text in self.q_data['options']:
-                    self.create_option_row(None, opt_text)  # ID 暂时为空
-
-                # 2. 【关键】立即触发后台同步，去获取这些选项的真实 ID
-                # 这样几百毫秒后，删除按钮就会生效
+                    self.create_option_row(None, opt_text)
+                # 后台同步 ID
                 self.load_options_async()
             else:
                 self.load_options_async()
@@ -178,8 +175,9 @@ class QuestionWidget(tk.Frame):
             return get_question_options(self.sock, self.q_id)
 
         def update_ui(rows):
-            # 只有当获取到真实数据时才清空重绘
-            if not rows: return
+            if not self.winfo_exists(): return
+            if not rows or not isinstance(rows, list): return
+
             for w in self.options_container.winfo_children(): w.destroy()
             for opt_id, opt_text in rows:
                 self.create_option_row(opt_id, opt_text)
@@ -195,10 +193,7 @@ class QuestionWidget(tk.Frame):
         ent.insert(0, text)
         ent.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
-        # 【修改】始终显示删除按钮，即使 ID 为空
-        # 如果 ID 为空，说明正在同步中，或者是一个全新的临时选项
         cmd = lambda: self.delete_option_ui(opt_id, row)
-
         if opt_id:
             ent.bind("<FocusOut>", lambda e, oid=opt_id, et=ent: self.save_option(oid, et.get()))
 
@@ -219,9 +214,6 @@ class QuestionWidget(tk.Frame):
         self.run_thread(lambda: update_option_text(self.sock, option_id, text))
 
     def add_new_option(self):
-        if self._busy: return
-        self._busy = True
-
         count = len(self.options_container.winfo_children()) + 1
         text = f"选项{count}"
 
@@ -229,32 +221,25 @@ class QuestionWidget(tk.Frame):
             return add_option(self.sock, self.q_id, count, text)
 
         def done(nid):
-            self.create_option_row(nid, text)
-            self._busy = False
+            if self.winfo_exists():
+                self.create_option_row(nid, text)
 
         self.run_thread(task, done)
 
     def delete_option_ui(self, option_id, row_widget):
         if messagebox.askyesno("确认", "删除此选项？", parent=self):
-            # 乐观UI：立即移除界面
             row_widget.destroy()
-
             if option_id:
-                # 如果有ID，去后台删
                 def task(): delete_option(self.sock, option_id)
 
                 self.run_thread(task)
-            # 如果没有ID，说明是还没同步下来的，界面删了就行了，不需要发请求
             self._refocus()
 
     def delete_me(self):
-        if self._busy: return
         if messagebox.askyesno("确认", "删除此题目？", parent=self):
-            self._busy = True
-            # 1. 立即从界面移除（乐观UI）
+            # 乐观UI：立即移除
             self.refresh_callback(scroll_action='delete', target_widget=self)
 
-            # 2. 后台请求删除
             def task():
                 try:
                     delete_question(self.sock, self.q_id)
@@ -264,16 +249,18 @@ class QuestionWidget(tk.Frame):
             threading.Thread(target=task, daemon=True).start()
 
     def copy_me(self):
-        if self._busy: return
-        self._busy = True
+        txt = self.title_entry.get()
+        opts = []
+        if self.q_type in ["choice", "checkbox"]:
+            for child in self.options_container.winfo_children():
+                for widget in child.winfo_children():
+                    if isinstance(widget, tk.Entry):
+                        opts.append(widget.get())
+        elif self.q_type == "slider":
+            opts = [str(i) for i in range(1, 11)]
 
-        def task(): copy_question(self.sock, self.survey_id, self.q_id)
-
-        def done(_):
-            self.refresh_callback(scroll_action='bottom')
-            self._busy = False
-
-        self.run_thread(task, done)
+        if self.append_callback:
+            self.append_callback(txt, self.q_type, opts)
 
     def save_all(self):
         self.save_title()
@@ -282,17 +269,26 @@ class QuestionWidget(tk.Frame):
 
 
 # ============================================================================
-# 3. 主窗口：问卷编辑器
+# 3. 主窗口：问卷编辑器 (增加模态加载遮罩)
 # ============================================================================
 class SurveyEditorWindow(tk.Toplevel):
-    def __init__(self, master, user_id, sock):
+    def __init__(self, master, user_id, sock=None):
         super().__init__(master)
         self.title("编辑调查")
-        self.sock = sock
+
+        # 建立独立连接
+        try:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.connect((SERVER_HOST, SERVER_PORT))
+        except Exception as e:
+            messagebox.showerror("连接错误", f"无法连接服务器: {e}")
+            self.destroy()
+            return
+
         self.user_id = user_id
         self.checker = ViolationChecker()
         self.survey_id = None
-        self._is_processing = False
+        self.loading_overlay = None  # 遮罩层
 
         master.update_idletasks()
         try:
@@ -303,13 +299,21 @@ class SurveyEditorWindow(tk.Toplevel):
 
         self.transient(master)
         self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.container = tk.Frame(self)
         self.container.pack(fill=tk.BOTH, expand=True)
         self.show_title_input_page()
 
-        # 【冷启动优化】在后台默默发一个请求预热一下连接
-        self.run_thread(lambda: get_question_options(self.sock, -1))
+        # 预热
+        threading.Thread(target=lambda: get_question_options(self.sock, -1), daemon=True).start()
+
+    def on_close(self):
+        try:
+            self.sock.close()
+        except:
+            pass
+        self.destroy()
 
     def _refocus(self):
         try:
@@ -317,6 +321,41 @@ class SurveyEditorWindow(tk.Toplevel):
             self.focus_force()
         except:
             pass
+
+    # =====================================================
+    # 核心新增：模态加载遮罩 (锁住鼠标)
+    # =====================================================
+    def show_loading(self, message="正在处理..."):
+        """显示全屏遮罩，阻止用户操作"""
+        if self.loading_overlay and self.loading_overlay.winfo_exists():
+            return
+
+        self.loading_overlay = tk.Toplevel(self)
+        self.loading_overlay.transient(self)
+        # grab_set 确保鼠标无法点击编辑器其他区域
+        self.loading_overlay.grab_set()
+        self.loading_overlay.wm_overrideredirect(True)  # 无边框
+
+        # 居中显示
+        try:
+            w, h = 300, 100
+            x = self.winfo_x() + (self.winfo_width() // 2) - (w // 2)
+            y = self.winfo_y() + (self.winfo_height() // 2) - (h // 2)
+            self.loading_overlay.geometry(f"{w}x{h}+{x}+{y}")
+        except:
+            self.loading_overlay.geometry("300x100+200+200")
+
+        frame = tk.Frame(self.loading_overlay, bg="#333333", bd=2, relief="raised")
+        frame.pack(fill=tk.BOTH, expand=True)
+        tk.Label(frame, text="⏳ " + message, fg="white", bg="#333333", font=("Arial", 12)).pack(expand=True)
+        self.update_idletasks()
+
+    def hide_loading(self):
+        """移除遮罩"""
+        if self.loading_overlay and self.loading_overlay.winfo_exists():
+            self.loading_overlay.grab_release()
+            self.loading_overlay.destroy()
+            self.loading_overlay = None
 
     def run_thread(self, target_func, callback=None, error_callback=None):
         def worker():
@@ -362,26 +401,47 @@ class SurveyEditorWindow(tk.Toplevel):
         if is_bad:
             return messagebox.showerror("违规", f"标题含违规词：{word}", parent=self)
 
-        self.config(cursor="watch")
+        # 开启遮罩，锁住鼠标
+        self.show_loading("正在创建问卷...")
 
         def task():
             return add_survey(self.sock, self.user_id, title, "draft")
 
         def done(sid):
             self.survey_id = sid
-            self.config(cursor="")
+            self.hide_loading()
             self.show_editor_page()
 
         def fail(e):
-            self.config(cursor="")
-            messagebox.showerror("错误", f"创建失败: {e}", parent=self)
+            self.hide_loading()
+            # 友好提示
+            if "超时" in str(e):
+                messagebox.showwarning("提示", "网络响应稍慢，请稍后重试。")
+            else:
+                messagebox.showerror("错误", f"创建失败: {e}", parent=self)
 
         self.run_thread(task, done, fail)
 
     # ------------------ 阶段 2: 编辑列表 ------------------
     def show_editor_page(self):
+        # 先清除旧界面
         for w in self.container.winfo_children(): w.destroy()
 
+        # 显示遮罩，异步加载详情
+        self.show_loading("加载数据中...")
+
+        def fetch_data():
+            # 在后台线程一次性获取所有数据
+            return get_full_survey_detail(self.sock, self.survey_id)
+
+        def build_ui(detail):
+            self.hide_loading()  # 数据回来了，取消遮罩
+            self._build_editor_layout(detail)  # 构建界面
+
+        self.run_thread(fetch_data, build_ui)
+
+    def _build_editor_layout(self, detail):
+        """实际构建编辑页面的 UI"""
         top = tk.Frame(self.container, bg="white", height=50, bd=1, relief="raised")
         top.pack(fill=tk.X, side=tk.TOP)
         tk.Button(top, text="🏠", font=("Arial", 16), bd=0, bg="white", cursor="hand2",
@@ -402,21 +462,13 @@ class SurveyEditorWindow(tk.Toplevel):
         tf = tk.Frame(preview, bg="white", pady=10)
         tf.pack(fill=tk.X)
 
+        cur_title = detail['survey_title'] if detail else "问卷标题"
         self.main_title_entry = tk.Entry(tf, font=("Arial", 18, "bold"), fg="#2196F3", bg="white", bd=0,
                                          justify="center")
+        self.main_title_entry.insert(0, cur_title)
         self.main_title_entry.pack(fill=tk.X, padx=20)
         self.main_title_entry.bind("<FocusOut>", self.update_survey_title_action)
         tk.Label(tf, text="添加问卷说明", fg="gray", bg="white").pack()
-
-        def fetch_title():
-            d = get_full_survey_detail(self.sock, self.survey_id)
-            return d['survey_title']
-
-        def set_title(t):
-            self.main_title_entry.delete(0, tk.END)
-            self.main_title_entry.insert(0, t)
-
-        self.run_thread(fetch_title, set_title)
 
         self.scroll_area = ScrollableFrame(preview)
         self.scroll_area.pack(fill=tk.BOTH, expand=True)
@@ -445,7 +497,11 @@ class SurveyEditorWindow(tk.Toplevel):
             tk.Button(tpl_box, text=lbl, font=("Arial", 11), bg="#F0F8FF", bd=0, pady=12, width=18, cursor="hand2",
                       command=lambda t=tp: self.add_template_directly(t)).grid(row=r, column=c, padx=10, pady=8)
 
-        self.render_questions()
+        # 初始渲染题目
+        questions = detail.get('questions', []) if detail else []
+        for q in questions:
+            QuestionWidget(self.scroll_area.scrollable_frame, q, self.survey_id, self.render_questions, self.checker,
+                           self.sock, self.add_question_internal)
 
     def update_survey_title_action(self, event):
         if not hasattr(self, 'main_title_entry') or not self.main_title_entry.winfo_exists(): return
@@ -472,16 +528,20 @@ class SurveyEditorWindow(tk.Toplevel):
         if scroll_action == 'keep':
             saved_y = self.scroll_area.canvas.yview()[0]
 
-        for w in self.scroll_area.scrollable_frame.winfo_children(): w.destroy()
+        # 全量刷新也加遮罩，防止乱点
+        self.show_loading("同步数据中...")
 
         def fetch():
             d = get_full_survey_detail(self.sock, self.survey_id)
             return d.get('questions', []) if d else []
 
         def draw(questions):
+            self.hide_loading()  # 取消遮罩
+            for w in self.scroll_area.scrollable_frame.winfo_children(): w.destroy()
+
             for q in questions:
                 QuestionWidget(self.scroll_area.scrollable_frame, q, self.survey_id, self.render_questions,
-                               self.checker, self.sock)
+                               self.checker, self.sock, self.add_question_internal)
 
             self.scroll_area.update_idletasks()
             if scroll_action == 'bottom':
@@ -504,44 +564,39 @@ class SurveyEditorWindow(tk.Toplevel):
         }
 
         QuestionWidget(self.scroll_area.scrollable_frame, q_data, self.survey_id, self.render_questions, self.checker,
-                       self.sock)
+                       self.sock, self.add_question_internal)
         self.scroll_area.update_idletasks()
         self.after(20, lambda: self.scroll_area.canvas.yview_moveto(1.0))
 
-    def add_question_directly(self, q_type):
-        if self._is_processing: return
-        self._is_processing = True
-        self.config(cursor="watch")
+    def add_question_internal(self, text, q_type, options):
+        # 开启遮罩，防止连点
+        self.show_loading("添加中...")
 
         current_count = len(self.scroll_area.scrollable_frame.winfo_children())
         new_index = current_count + 1
-        titles = {"choice": "单选题", "checkbox": "多选题", "text": "填空题", "slider": "评分题 (1-10)"}
-        options = [str(i) for i in range(1, 11)] if q_type == "slider" else (
-            ["选项1", "选项2"] if q_type in ["choice", "checkbox"] else [])
 
         def bg_task():
-            return add_question_with_options(self.sock, self.survey_id, new_index, titles[q_type], q_type, options)
+            return add_question_with_options(self.sock, self.survey_id, new_index, text, q_type, options)
 
         def done(qid):
-            self._append_new_question(qid, titles[q_type], q_type, options)
-            self._is_processing = False
-            self.config(cursor="")
+            self.hide_loading()
+            self._append_new_question(qid, text, q_type, options)
 
         def fail(e):
-            self._is_processing = False
-            self.config(cursor="")
-            messagebox.showerror("错误", f"添加失败: {e}", parent=self)
+            self.hide_loading()
+            # 失败则全量刷新回滚
+            print(f"Add failed: {e}, syncing UI...")
+            self.render_questions(scroll_action='bottom')
 
         self.run_thread(bg_task, done, fail)
 
+    def add_question_directly(self, q_type):
+        titles = {"choice": "单选题", "checkbox": "多选题", "text": "填空题", "slider": "评分题 (1-10)"}
+        options = [str(i) for i in range(1, 11)] if q_type == "slider" else (
+            ["选项1", "选项2"] if q_type in ["choice", "checkbox"] else [])
+        self.add_question_internal(titles[q_type], q_type, options)
+
     def add_template_directly(self, tpl_type):
-        if self._is_processing: return
-        self._is_processing = True
-        self.config(cursor="watch")
-
-        current_count = len(self.scroll_area.scrollable_frame.winfo_children())
-        new_index = current_count + 1
-
         tpls = {
             "tpl_name": {"t": "您的姓名是？", "y": "text", "o": []},
             "tpl_gender": {"t": "您的性别？", "y": "choice", "o": ["女", "男", "其他"]},
@@ -550,40 +605,37 @@ class SurveyEditorWindow(tk.Toplevel):
             "tpl_mobile": {"t": "请输入您的电话号码：", "y": "text", "o": []}
         }
         t = tpls.get(tpl_type)
-        if not t:
-            self._is_processing = False
-            self.config(cursor="")
-            return
-
-        def bg_task():
-            return add_question_with_options(self.sock, self.survey_id, new_index, t['t'], t['y'], t['o'])
-
-        def done(qid):
-            self._append_new_question(qid, t['t'], t['y'], t['o'])
-            self._is_processing = False
-            self.config(cursor="")
-
-        def fail(e):
-            self._is_processing = False
-            self.config(cursor="")
-            messagebox.showerror("错误", f"添加失败: {e}", parent=self)
-
-        self.run_thread(bg_task, done, fail)
+        if t:
+            self.add_question_internal(t['t'], t['y'], t['o'])
 
     def finish_editing(self):
         if hasattr(self, 'main_title_entry'):
-            self.update_survey_title_action(None)
+            # 主线程获取标题
+            title = self.main_title_entry.get().strip()
+        else:
+            title = None
 
         if messagebox.askyesno("发布", "是否立即发布问卷？\n(是=发布, 否=存草稿)", parent=self):
+            # 开启遮罩，防止误触
+            self.show_loading("发布中...")
+
             def task():
+                if title:
+                    update_survey_title(self.sock, self.survey_id, title)
                 publish_survey(self.sock, self.survey_id)
 
             def done(_):
+                self.hide_loading()
                 messagebox.showinfo("成功", "已发布！", parent=self)
                 self.destroy()
 
             def fail(e):
-                messagebox.showerror("失败", str(e), parent=self)
+                self.hide_loading()
+                if "超时" in str(e):
+                    messagebox.showwarning("超时", "请求已发送，请刷新列表查看。", parent=self)
+                    self.destroy()
+                else:
+                    messagebox.showerror("失败", str(e), parent=self)
 
             self.run_thread(task, done, fail)
         else:
@@ -591,13 +643,18 @@ class SurveyEditorWindow(tk.Toplevel):
 
     def confirm_exit_home(self):
         if not self.survey_id: return self.destroy()
+
+        title = None
         if hasattr(self, 'main_title_entry'):
-            self.update_survey_title_action(None)
+            title = self.main_title_entry.get().strip()
 
         res = messagebox.askyesno("返回", "保存当前草稿？\n(是=保存, 否=删除)", parent=self)
         self._refocus()
 
         if res:
+            if title:
+                threading.Thread(target=lambda: update_survey_title(self.sock, self.survey_id, title),
+                                 daemon=True).start()
             self.destroy()
         else:
             if messagebox.askyesno("确认", "确定删除？不可恢复。", parent=self):
