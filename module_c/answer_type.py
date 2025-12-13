@@ -8,22 +8,30 @@ import jieba
 from sklearn.feature_extraction.text import TfidfVectorizer
 from wordcloud import WordCloud
 from typing import List, Dict, Optional
+import socket # 引入 socket 类型提示，虽然是 Optional[object]
 
 matplotlib.use("Agg")
 
 # =====================================================
-# 路径配置：添加上级目录以导入 db_utils
+# 路径配置：添加上级目录以导入 db_proxy
 # =====================================================
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-import db_utils
+# -----------------------------------------------
+# 关键修正 1: 替换导入 db_utils 为 db_proxy
+# -----------------------------------------------
+try:
+    import db_proxy
+except ImportError:
+    print("导入 db_proxy 失败，请确保 db_proxy.py 文件存在于正确的路径。")
+    sys.exit(1)
 
 
 # =====================================================
-# 【统一字体策略】Matplotlib + WordCloud 多平台兜底
+# 【统一字体策略】Matplotlib + WordCloud 多平台兜底 (保持不变)
 # =====================================================
 
 # Matplotlib：简单、稳定
@@ -59,6 +67,7 @@ def get_wc_font_path():
 
 
 WC_FONT_PATH = get_wc_font_path()
+# ... (DEBUG 代码保持不变) ...
 
 
 def _fig_to_png(fig: plt.Figure) -> bytes:
@@ -70,11 +79,14 @@ def _fig_to_png(fig: plt.Figure) -> bytes:
 
 
 # =====================================================
-# 数据适配层
+# 数据适配层 - 【关键修正 2: 添加 sock 参数，修改调用】
 # =====================================================
 
-def get_question_adapter(survey_id: int, question_id: int):
-    full_data = db_utils.get_full_survey_detail(survey_id)
+def get_question_adapter(survey_id: int, question_id: int, sock: Optional[socket.socket] = None):
+    # -----------------------------------------------
+    # 关键修正 3: 使用 db_proxy
+    # -----------------------------------------------
+    full_data = db_proxy.get_full_survey_detail(sock, survey_id)
     if not full_data:
         return None
 
@@ -87,8 +99,11 @@ def get_question_adapter(survey_id: int, question_id: int):
     return None
 
 
-def get_answers_list_adapter(survey_id: int, question_id: int) -> List[str]:
-    summary = db_utils.get_survey_answers_summary(survey_id)
+def get_answers_list_adapter(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> List[str]:
+    # -----------------------------------------------
+    # 关键修正 3: 使用 db_proxy
+    # -----------------------------------------------
+    summary = db_proxy.get_survey_answers_summary(sock, survey_id)
     if not summary:
         return []
 
@@ -96,20 +111,38 @@ def get_answers_list_adapter(survey_id: int, question_id: int) -> List[str]:
     for q in summary['questions']:
         if q['question_id'] == question_id:
             for a in q['answers']:
-                if a['answer']:
-                    answers.append(str(a['answer']).strip())
+                # 兼容可能的键名或结构
+                answer_content = a.get('answer', a.get('answer_content'))
+                if answer_content:
+                    answers.append(str(answer_content).strip())
             break
     return answers
 
 
-def get_options_adapter(question_id: int) -> List[Dict]:
-    raw = db_utils.get_question_options(question_id)
-    return [{"option_text": t, "option_index": i + 1} for i, (_, t) in enumerate(raw)]
+def get_options_adapter(question_id: int, sock: Optional[socket.socket] = None) -> List[Dict]:
+    # -----------------------------------------------
+    # 关键修正 3: 使用 db_proxy
+    # -----------------------------------------------
+    raw = db_proxy.get_question_options(sock, question_id)
+    # 假设 get_question_options 返回的是 [(id, text), ...] 列表
+    # 如果 db_proxy 返回的是 [{...}, ...]，则需要根据实际结构调整
+    if not raw:
+        return []
+
+    if isinstance(raw[0], tuple):
+        # 兼容旧的 (id, text) 格式
+        return [{"option_text": t, "option_index": i + 1} for i, (_, t) in enumerate(raw)]
+    elif isinstance(raw[0], dict):
+         # 如果 db_proxy 返回的是字典列表，例如 [{'option_id': 1, 'option_text': 'A'}, ...]
+         return [{"option_text": item['option_text'], "option_index": i + 1} for i, item in enumerate(raw)]
+    return []
 
 
 # =====================================================
-# 词云 / TF-IDF 核心逻辑（已彻底修复）
+# 词云 / TF-IDF 核心逻辑 (修改调用)
 # =====================================================
+
+# (jieba_tokenizer 和 SIMPLE_STOPWORDS 保持不变)
 
 SIMPLE_STOPWORDS = {
     '的', '是', '了', '和', '在', '我', '你', '它', '这', '那',
@@ -138,8 +171,11 @@ def jieba_tokenizer(text: str) -> List[str]:
     return results
 
 
-def calculate_tfidf_weights(survey_id: int, question_id: int) -> Dict[str, float]:
-    answers = get_answers_list_adapter(survey_id, question_id)
+def calculate_tfidf_weights(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> Dict[str, float]:
+    # -----------------------------------------------
+    # 关键修正 3: 传递 sock
+    # -----------------------------------------------
+    answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
     if not answers:
         return {}
 
@@ -178,9 +214,14 @@ def calculate_tfidf_weights(survey_id: int, question_id: int) -> Dict[str, float
     return dict(sorted(tfidf_dict.items(), key=lambda x: x[1], reverse=True))
 
 
-def generate_tfidf_wordcloud(survey_id: int, question_id: int) -> bytes:
-    q = get_question_adapter(survey_id, question_id)
-    answers = get_answers_list_adapter(survey_id, question_id)
+def generate_tfidf_wordcloud(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> bytes:
+    # -----------------------------------------------
+    # 关键修正 3: 传递 sock
+    # -----------------------------------------------
+    q = get_question_adapter(survey_id, question_id, sock=sock)
+    answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
+
+    # ... (绘图逻辑保持不变) ...
 
     # 无人作答
     if not answers:
@@ -189,7 +230,9 @@ def generate_tfidf_wordcloud(survey_id: int, question_id: int) -> bytes:
         ax.axis("off")
         return _fig_to_png(fig)
 
-    tfidf_weights = calculate_tfidf_weights(survey_id, question_id)
+    tfidf_weights = calculate_tfidf_weights(survey_id, question_id, sock=sock)
+
+    # ... (绘图逻辑保持不变) ...
 
     # 作答存在，但无语义内容
     if not tfidf_weights:
@@ -223,18 +266,42 @@ def generate_tfidf_wordcloud(survey_id: int, question_id: int) -> bytes:
 
 
 # =====================================================
-# 选择题统计图
+# 选择题统计图 (修改调用)
 # =====================================================
 
-def aggregate_choice_counts(survey_id: int, question_id: int):
-    options = get_options_adapter(question_id)
-    counts = {o["option_text"]: 0 for o in options}
+def aggregate_choice_counts(survey_id: int, question_id: int, sock: Optional[socket.socket] = None):
+    # 1. 获取问题类型 (新增)
+    q = get_question_adapter(survey_id, question_id, sock=sock)
+    q_type = q["question_type"].lower() if q else "unknown"
+
+    # 2. 获取选项列表
+    options_text_list = []
+    if q_type == "slide":  # 或 "slider", 取决于数据库中实际存储的类型
+        # 针对 Slider 题型，强制使用 1 到 10 的选项文本
+        options_text_list = [str(i) for i in range(1, 11)]
+    else:
+        # 其他题型，从数据库获取选项
+        options = get_options_adapter(question_id, sock=sock)
+        options_text_list = [o["option_text"] for o in options]
+
+    # 3. 初始化计数器
+    counts = {o: 0 for o in options_text_list}
     counts["其他"] = 0
 
-    answers = get_answers_list_adapter(survey_id, question_id)
+    answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
 
+    # 4. 遍历回答进行计数
     for a in answers:
+        # 注意：对于 slider，a 应该是一个单一数字字符串，例如 '5'
+        # 但我们仍然使用 split "," 来兼容选择题
         parts = [p.strip() for p in a.replace(";", ",").split(",") if p.strip()]
+
+        # 兼容 slider 只有一个回答值的情况
+        if q_type == "slide" and len(parts) == 1 and parts[0] in counts:
+            counts[parts[0]] += 1
+            continue  # 处理下一个回答
+
+        # 兼容 choice/checkbox/radio 的逻辑
         matched = False
         for p in parts:
             if p in counts:
@@ -247,10 +314,14 @@ def aggregate_choice_counts(survey_id: int, question_id: int):
         del counts["其他"]
     return counts
 
+def generate_pie_chart(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> bytes:
+    # -----------------------------------------------
+    # 关键修正 3: 传递 sock
+    # -----------------------------------------------
+    q = get_question_adapter(survey_id, question_id, sock=sock)
+    counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id, sock=sock).items() if v > 0}
 
-def generate_pie_chart(survey_id: int, question_id: int) -> bytes:
-    q = get_question_adapter(survey_id, question_id)
-    counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id).items() if v > 0}
+    # ... (绘图逻辑保持不变) ...
 
     if not counts:
         fig, ax = plt.subplots()
@@ -266,9 +337,14 @@ def generate_pie_chart(survey_id: int, question_id: int) -> bytes:
     return _fig_to_png(fig)
 
 
-def generate_bar_chart(survey_id: int, question_id: int, horizontal=False) -> bytes:
-    q = get_question_adapter(survey_id, question_id)
-    counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id).items() if v > 0}
+def generate_bar_chart(survey_id: int, question_id: int, horizontal: bool = False, sock: Optional[socket.socket] = None) -> bytes:
+    # -----------------------------------------------
+    # 关键修正 3: 传递 sock
+    # -----------------------------------------------
+    q = get_question_adapter(survey_id, question_id, sock=sock)
+    counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id, sock=sock).items() if v > 0}
+
+    # ... (绘图逻辑保持不变) ...
 
     if not counts:
         fig, ax = plt.subplots()
@@ -291,10 +367,15 @@ def generate_bar_chart(survey_id: int, question_id: int, horizontal=False) -> by
     return _fig_to_png(fig)
 
 
-def generate_line_chart(survey_id: int, question_id: int) -> bytes:
-    q = get_question_adapter(survey_id, question_id)
-    options = get_options_adapter(question_id)
-    answers = get_answers_list_adapter(survey_id, question_id)
+def generate_line_chart(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> bytes:
+    # -----------------------------------------------
+    # 关键修正 3: 传递 sock
+    # -----------------------------------------------
+    q = get_question_adapter(survey_id, question_id, sock=sock)
+    options = get_options_adapter(question_id, sock=sock)
+    answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
+
+    # ... (绘图逻辑保持不变) ...
 
     if not options:
         fig, ax = plt.subplots()
@@ -326,11 +407,14 @@ def generate_line_chart(survey_id: int, question_id: int) -> bytes:
 
 
 # =====================================================
-# 统一入口
+# 统一入口 - 【关键修正 4: 添加 sock 参数】
 # =====================================================
 
-def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str) -> bytes:
-    q = get_question_adapter(survey_id, question_id) if question_id else None
+def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str, sock: Optional[socket.socket] = None) -> bytes:
+    # -----------------------------------------------
+    # 关键修正 3: 传递 sock
+    # -----------------------------------------------
+    q = get_question_adapter(survey_id, question_id, sock=sock) if question_id else None
     q_type = q["question_type"].lower() if q else "unknown"
 
     chart_type = chart_type.lower()
@@ -338,19 +422,19 @@ def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str)
     if chart_type == "wordcloud":
         if q_type not in ("text", "textarea"):
             raise ValueError("仅文本题支持词云")
-        return generate_tfidf_wordcloud(survey_id, question_id)
+        return generate_tfidf_wordcloud(survey_id, question_id, sock=sock)
 
     if chart_type in ("pie", "bar", "bar_h", "line_answer"):
         if q_type not in ("choice", "radio", "checkbox", "slide"):
             raise ValueError("仅选择题支持统计图")
 
         if chart_type == "pie":
-            return generate_pie_chart(survey_id, question_id)
+            return generate_pie_chart(survey_id, question_id, sock=sock)
         if chart_type == "bar":
-            return generate_bar_chart(survey_id, question_id, False)
+            return generate_bar_chart(survey_id, question_id, False, sock=sock)
         if chart_type == "bar_h":
-            return generate_bar_chart(survey_id, question_id, True)
+            return generate_bar_chart(survey_id, question_id, True, sock=sock)
         if chart_type == "line_answer":
-            return generate_line_chart(survey_id, question_id)
+            return generate_line_chart(survey_id, question_id, sock=sock)
 
     raise ValueError(f"不支持的图表类型：{chart_type}")

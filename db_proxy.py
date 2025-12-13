@@ -19,6 +19,8 @@ def get_user_by_login(sock, identifier: str) -> Optional[Dict[str, Any]]:
 def get_user_id_by_name(sock, user_name: str) -> Optional[int]:
     return send_request("get_user_id_by_name", {"user_name": user_name}, sock=sock)
 
+def get_username_by_id(sock, user_id: int) -> Optional[str]:
+    return send_request("get_username_by_id", {"user_id": user_id}, sock=sock)
 # ==============================
 # 问卷相关接口
 # ==============================
@@ -47,6 +49,9 @@ def add_question_with_options(sock, survey_id: int, question_index: int, questio
 
 def get_survey(sock, survey_id: int) -> Optional[Dict[str, Any]]:
     return send_request("get_survey", {"survey_id": survey_id}, sock=sock)
+
+def get_survey_answers_summary(sock, survey_id: int) -> Optional[Dict[str, Any]]:
+    return send_request("get_survey_answers_summary", {"survey_id": survey_id}, sock=sock)
 
 def get_full_survey_detail(sock, survey_id: int) -> Optional[Dict[str, Any]]:
     return send_request("get_full_survey_detail", {"survey_id": survey_id}, sock=sock)

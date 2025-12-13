@@ -1,20 +1,29 @@
 import sys
 import os
+import socket  # 引入标准的 socket 库
 
 # 导入utils模块（包含新增的get_username_by_id函数）
 try:
-    from db_utils import (
+    # 核心修改 1：移除对 connect_to_server 和 close_connection 的导入
+    # 仅导入 db_proxy 需要的函数，以及 client_socket 中存在的连接常量
+    from module_b.client_socket import SERVER_HOST, SERVER_PORT
+
+    from db_proxy import (
         get_public_surveys, get_survey, update_survey_status,
-        delete_survey, get_username_by_id  # 导入新增的函数
+        delete_survey, get_username_by_id
     )
 except ImportError as e:
-    print(f"导入失败！请确保utils.py与manager.py在同一目录。错误详情：{e}")
+    # 错误提示更新
+    print(f"导入失败！请确保db_proxy.py与manager.py在同一目录，且module_b.client_socket可用。错误详情：{e}")
     sys.exit(1)
 
 # 预设管理员账号和密码（仅校验账号密码，跳过数据库）
 ADMIN_ACCOUNTS = {"manager1", "manager2", "manager3"}
 ADMIN_PASSWORD_PLAIN = "management"  # 明文预设密码
 
+# 全局变量来存储套接字连接 (初始化为 None)
+global global_sock
+global_sock = None
 
 def admin_login():
     """管理员登录验证（仅校验账号密码，跳过数据库）"""
@@ -47,8 +56,15 @@ def admin_login():
 def list_all_surveys():
     """查看所有问卷及对应发布者信息（修复发布者显示问题）"""
     print("\n===== 系统所有问卷列表 =====")
+    # 核心修复点 1：使用全局套接字
+    global global_sock
+    if not global_sock:
+        print("错误：未建立与服务器的连接！")
+        return
+
     all_surveys = []
-    active_surveys = get_public_surveys()
+    # 核心修复点 2：传递 sock 参数
+    active_surveys = get_public_surveys(global_sock)
 
     for survey in active_surveys:
         # 1. 获取问卷基础信息
@@ -57,11 +73,11 @@ def list_all_surveys():
         creator_id = survey["created_by"]  # 发布者ID
         release_time = survey["release_time"] or "未设置"
 
-        # 2. 核心修复：调用新增的get_username_by_id函数查询发布者名称
-        creator_name = get_username_by_id(creator_id)
+        # 2. 核心修复：调用新增的get_username_by_id函数查询发布者名称，并传递 sock
+        creator_name = get_username_by_id(global_sock, creator_id)
 
-        # 3. 获取问卷最新状态
-        survey_detail = get_survey(survey_id)
+        # 3. 获取问卷最新状态，并传递 sock
+        survey_detail = get_survey(global_sock, survey_id)
         survey_status = survey_detail["survey_status"] if survey_detail else "未知"
 
         # 4. 组装问卷信息
@@ -74,7 +90,7 @@ def list_all_surveys():
             "release_time": release_time
         })
 
-    # 格式化输出（显示问卷ID、标题、发布者ID、发布者名称、状态、发布时间）
+    # 格式化输出
     print(f"{'问卷ID':<10} {'问卷标题':<30} {'发布者ID':<10} {'发布者名称':<10} {'状态':<15} {'发布时间':<20}")
     print("-" * 100)
     if not all_surveys:
@@ -90,10 +106,15 @@ def list_all_surveys():
 def ban_survey():
     """封禁指定问卷（将状态改为banned）"""
     print("\n===== 封禁问卷 =====")
+    global global_sock
+    if not global_sock:
+        print("错误：未建立与服务器的连接！")
+        return
+
     try:
         survey_id = int(input("请输入要封禁的问卷ID：").strip())
-        # 1. 验证问卷是否存在
-        survey = get_survey(survey_id)
+        # 1. 验证问卷是否存在，并传递 sock
+        survey = get_survey(global_sock, survey_id)
         if not survey:
             print(f"错误：问卷ID {survey_id} 不存在！")
             return
@@ -103,8 +124,8 @@ def ban_survey():
             print(f"提示：问卷ID {survey_id} 已处于封禁状态，无需重复操作。")
             return
 
-        # 3. 执行封禁
-        update_survey_status(survey_id, "banned")
+        # 3. 执行封禁，并传递 sock
+        update_survey_status(global_sock, survey_id, "banned")
         print(f"成功：问卷ID {survey_id}（{survey['survey_title']}）已封禁，用户无法填写。")
     except ValueError:
         print("错误：问卷ID必须是数字！")
@@ -115,10 +136,15 @@ def ban_survey():
 def delete_survey_confirm():
     """删除指定问卷（物理删除，需二次确认）"""
     print("\n===== 删除问卷 =====")
+    global global_sock
+    if not global_sock:
+        print("错误：未建立与服务器的连接！")
+        return
+
     try:
         survey_id = int(input("请输入要删除的问卷ID：").strip())
-        # 1. 验证问卷是否存在
-        survey = get_survey(survey_id)
+        # 1. 验证问卷是否存在，并传递 sock
+        survey = get_survey(global_sock, survey_id)
         if not survey:
             print(f"错误：问卷ID {survey_id} 不存在！")
             return
@@ -130,8 +156,8 @@ def delete_survey_confirm():
             print("操作已取消。")
             return
 
-        # 3. 执行删除
-        delete_survey(survey_id)
+        # 3. 执行删除，并传递 sock
+        delete_survey(global_sock, survey_id)
         print(f"成功：问卷ID {survey_id}（{survey['survey_title']}）已永久删除。")
     except ValueError:
         print("错误：问卷ID必须是数字！")
@@ -142,10 +168,15 @@ def delete_survey_confirm():
 def unban_survey():
     """解封指定问卷（将状态改回active）"""
     print("\n===== 解封问卷 =====")
+    global global_sock
+    if not global_sock:
+        print("错误：未建立与服务器的连接！")
+        return
+
     try:
         survey_id = int(input("请输入要解封的问卷ID：").strip())
-        # 1. 验证问卷是否存在
-        survey = get_survey(survey_id)
+        # 1. 验证问卷是否存在，并传递 sock
+        survey = get_survey(global_sock, survey_id)
         if not survey:
             print(f"错误：问卷ID {survey_id} 不存在！")
             return
@@ -155,8 +186,8 @@ def unban_survey():
             print(f"提示：问卷ID {survey_id} 当前状态为「{survey['survey_status']}」，无需解封。")
             return
 
-        # 3. 执行解封
-        update_survey_status(survey_id, "active")
+        # 3. 执行解封，并传递 sock
+        update_survey_status(global_sock, survey_id, "active")
         print(f"成功：问卷ID {survey_id}（{survey['survey_title']}）已解封，用户可正常填写。")
     except ValueError:
         print("错误：问卷ID必须是数字！")
@@ -185,6 +216,16 @@ def show_admin_menu():
         elif choice == "4":
             unban_survey()
         elif choice == "0":
+            # 退出时关闭连接
+            global global_sock
+            if global_sock:
+                print("正在关闭服务器连接...")
+                # 核心修改 3：直接调用套接字对象的 close() 方法
+                try:
+                    global_sock.close()
+                except Exception:
+                    # 忽略关闭时的错误
+                    pass
             print("正在退出管理员界面...")
             print("感谢使用，再见！")
             sys.exit(0)
@@ -194,8 +235,34 @@ def show_admin_menu():
 
 def main():
     """程序主入口"""
+    global global_sock
+
+    # 0. 核心修改 2：使用 socket 库和导入的常量手动实现连接
+    try:
+        print(f"正在尝试连接到数据库代理服务器 ({SERVER_HOST}:{SERVER_PORT})...")
+
+        # 1. 创建套接字
+        global_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # 2. 连接服务器
+        global_sock.connect((SERVER_HOST, SERVER_PORT))
+        print("连接成功。")
+
+    except ConnectionRefusedError:
+        print(f"错误：无法连接到数据库代理服务器。服务器在 {SERVER_HOST}:{SERVER_PORT} 未运行或拒绝连接。")
+        sys.exit(1)
+    except Exception as e:
+        print(f"错误：无法连接到数据库代理服务器。请确保服务器已运行。错误详情：{e}")
+        sys.exit(1)
+
     # 1. 管理员登录
     if not admin_login():
+        # 如果登录失败，确保关闭连接
+        if global_sock:
+            try:
+                global_sock.close()
+            except Exception:
+                pass
         sys.exit(1)
 
     # 2. 显示管理菜单
