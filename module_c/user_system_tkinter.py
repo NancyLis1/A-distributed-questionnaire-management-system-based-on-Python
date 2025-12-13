@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import sys
 import os
+from module_a.ui_editor_treading import SurveyEditorWindow  # 导入 A 的编辑器
+from module_b.fill_survey_gui_treading import MainWindow as FillSurveyMainWindow
 
 # =====================================================
 # 路径配置：添加上级目录以导入 db_utils
@@ -382,37 +384,14 @@ class DashboardView(tk.Frame):
 
     # ... (open_fill_survey 和 open_editor 保持不变)
     def open_fill_survey(self):
-        # ...
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showwarning("提示", "请选择一个问卷进行填写")
-            return
-
-        # 提取选中问卷的ID
-        item = self.tree.item(selected[0])
-        survey_id = item['values'][0]
-
-        if FillSurveyMainWindow:
-            # 传递 survey_id
-            FillSurveyMainWindow(self.master, self.user_id, self.sock, survey_id=survey_id)
-        else:
-            messagebox.showerror("错误", "填写问卷模块(Module B)未加载")
+        """点击填写问卷 → 打开填写问卷主界面，并关闭当前面板"""
+        # ✅ 打开填写问卷的 MainWindow
+        FillSurveyMainWindow(self.master, self.user_id, self.sock)
 
     def open_editor(self):
-        # ...
-        selected = self.tree.selection()
-        survey_id_to_edit = None
-
-        if self.current_list_type == "mine" and selected:
-            item = self.tree.item(selected[0])
-            # 确保选中的问卷是自己创建的
-            survey_id_to_edit = item['values'][0]
-
-        if SurveyEditorWindow:
-            # 传递 sock 参数，并传递选中的 survey_id (如果存在，否则为 None，表示创建新问卷)
-            SurveyEditorWindow(self.master, self.user_id, sock=self.sock, edit_survey_id=survey_id_to_edit)
-        else:
-            messagebox.showerror("错误", "问卷编辑器模块(Module A)未加载")
+        """点击按钮，跳转到 A 的问卷创建界面"""
+        # 使用 Toplevel 打开新窗口，保持 root 存在
+        SurveyEditorWindow(self.master, self.user_id, self.sock)
 # =====================================================
 # Main Application - 【已修复 sock 传递和 DashboardView 实例化】
 # =====================================================
