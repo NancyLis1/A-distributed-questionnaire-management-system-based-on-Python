@@ -172,7 +172,6 @@ def add_full_survey_submission(user_id: int, survey_id: int, answers: List[Dict[
 
     # 1. 记录问卷填写历史 (假设您已有的函数，它不接受 sock 参数)
     # 如果该函数在您的 db_utils.py 中需要自行处理 DB 连接和事务，请在这里处理
-    add_answer_survey_history(user_id, survey_id)
 
     # 2. 循环提交所有问题答案 (使用服务器的本地数据库操作)
     for answer_data in answers:
@@ -183,6 +182,7 @@ def add_full_survey_submission(user_id: int, survey_id: int, answers: List[Dict[
             # 假设您已有的函数
             add_answer(user_id, survey_id, question_id, answer_text)
 
+    add_answer_survey_history(user_id, survey_id)
     # 如果上述函数执行无误，则返回成功
     return True
 
