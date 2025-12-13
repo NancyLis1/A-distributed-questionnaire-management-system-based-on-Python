@@ -8,9 +8,8 @@ import jieba
 from sklearn.feature_extraction.text import TfidfVectorizer
 from wordcloud import WordCloud
 from typing import List, Dict, Optional
-# WordCloud 专用字体（Windows）
-WC_FONT_PATH = r"C:/Windows/Fonts/simhei.ttf"
 
+matplotlib.use("Agg")
 
 # =====================================================
 # 路径配置：添加上级目录以导入 db_utils
@@ -20,16 +19,46 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-import db_utils  # 从上级目录导入
+import db_utils
 
-matplotlib.use("Agg")
 
 # =====================================================
-# 字体配置（简化版）
+# 【统一字体策略】Matplotlib + WordCloud 多平台兜底
 # =====================================================
-# 设置中文显示
+
+# Matplotlib：简单、稳定
 plt.rcParams['font.family'] = 'SimHei'
 plt.rcParams['axes.unicode_minus'] = False
+
+
+def get_wc_font_path():
+    """
+    WordCloud 专用字体路径，多平台兜底
+    """
+    candidates = []
+
+    system = platform.system()
+    if system == "Windows":
+        candidates = [
+            r"C:/Windows/Fonts/simhei.ttf",
+            r"C:/Windows/Fonts/msyh.ttc",
+        ]
+    elif system == "Darwin":
+        candidates = [
+            "/System/Library/Fonts/PingFang.ttc",
+        ]
+    else:  # Linux / Docker
+        candidates = [
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        ]
+
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+WC_FONT_PATH = get_wc_font_path()
 
 
 def _fig_to_png(fig: plt.Figure) -> bytes:
@@ -43,6 +72,7 @@ def _fig_to_png(fig: plt.Figure) -> bytes:
 # =====================================================
 # 数据适配层
 # =====================================================
+
 def get_question_adapter(survey_id: int, question_id: int):
     full_data = db_utils.get_full_survey_detail(survey_id)
     if not full_data:
@@ -62,30 +92,25 @@ def get_answers_list_adapter(survey_id: int, question_id: int) -> List[str]:
     if not summary:
         return []
 
-    target_answers = []
+    answers = []
     for q in summary['questions']:
         if q['question_id'] == question_id:
-            for ans_obj in q['answers']:
-                if ans_obj['answer']:
-                    target_answers.append(str(ans_obj['answer']).strip())
+            for a in q['answers']:
+                if a['answer']:
+                    answers.append(str(a['answer']).strip())
             break
-    return target_answers
+    return answers
 
 
 def get_options_adapter(question_id: int) -> List[Dict]:
-    raw_options = db_utils.get_question_options(question_id)
-    options = []
-    for idx, (opt_id, opt_text) in enumerate(raw_options):
-        options.append({
-            "option_text": opt_text,
-            "option_index": idx + 1
-        })
-    return options
+    raw = db_utils.get_question_options(question_id)
+    return [{"option_text": t, "option_index": i + 1} for i, (_, t) in enumerate(raw)]
 
 
 # =====================================================
-# 词云与 TF-IDF
+# 词云 / TF-IDF 核心逻辑（已彻底修复）
 # =====================================================
+
 SIMPLE_STOPWORDS = {
     '的', '是', '了', '和', '在', '我', '你', '它', '这', '那',
     '我们', '他们', '一个', '一种', '一些', '可以', '进行',
@@ -95,19 +120,22 @@ SIMPLE_STOPWORDS = {
 
 def jieba_tokenizer(text: str) -> List[str]:
     words = jieba.lcut(text.lower())
-    result = []
+    results = []
 
-    for word in words:
-        word = word.strip()
-        if len(word) <= 1 or word in SIMPLE_STOPWORDS:
+    for w in words:
+        w = w.strip()
+        if len(w) <= 1 or w in SIMPLE_STOPWORDS:
             continue
 
-        if any('\u4e00' <= c <= '\u9fa5' for c in word):
-            result.append(word)
-        elif word.isalnum() and not word.isdigit():
-            result.append(word)
+        # 中文
+        if any('\u4e00' <= c <= '\u9fa5' for c in w):
+            results.append(w)
 
-    return result
+        # 字母 / 字母数字混合（如 A888）
+        elif w.isalnum() and not w.isdigit():
+            results.append(w)
+
+    return results
 
 
 def calculate_tfidf_weights(survey_id: int, question_id: int) -> Dict[str, float]:
@@ -115,85 +143,91 @@ def calculate_tfidf_weights(survey_id: int, question_id: int) -> Dict[str, float
     if not answers:
         return {}
 
-    # 1️⃣ 分词 + 拼接
-    processed_answers = [" ".join(jieba_tokenizer(a)) for a in answers]
+    processed = [" ".join(jieba_tokenizer(a)) for a in answers]
 
-    # 2️⃣ 【关键修复点 1】
-    # 过滤掉空字符串文档（否则会产生空 token）
-    processed_answers = [p for p in processed_answers if p.strip()]
-
-    # 如果过滤后已经没有任何有效文本，直接返回
-    if not processed_answers:
+    # ⭐ 关键修复 1：过滤空文本
+    processed = [p for p in processed if p.strip()]
+    if not processed:
         return {}
 
     vectorizer = TfidfVectorizer(
-        tokenizer=lambda x: x.split(' '),
+        tokenizer=lambda x: x.split(" "),
         lowercase=False,
         token_pattern=None
     )
 
     try:
-        tfidf_matrix = vectorizer.fit_transform(processed_answers)
+        tfidf = vectorizer.fit_transform(processed)
     except ValueError:
         return {}
 
-    if hasattr(vectorizer, 'get_feature_names_out'):
-        feature_names = vectorizer.get_feature_names_out()
-    else:
-        feature_names = vectorizer.get_feature_names()
+    feature_names = (
+        vectorizer.get_feature_names_out()
+        if hasattr(vectorizer, "get_feature_names_out")
+        else vectorizer.get_feature_names()
+    )
 
-    if tfidf_matrix.shape[0] == 0:
-        return {}
-
-    tfidf_scores = tfidf_matrix.max(axis=0).toarray()[0]
+    scores = tfidf.max(axis=0).toarray()[0]
 
     tfidf_dict = {}
-    for word, score in zip(feature_names, tfidf_scores):
-        # 3️⃣ 【关键修复点 2】
-        # 显式过滤空特征名
+    for word, score in zip(feature_names, scores):
+        # ⭐ 关键修复 2：过滤空 token
         if word and score > 0:
             tfidf_dict[word] = score
 
-    return dict(sorted(tfidf_dict.items(), key=lambda item: item[1], reverse=True))
+    return dict(sorted(tfidf_dict.items(), key=lambda x: x[1], reverse=True))
+
 
 def generate_tfidf_wordcloud(survey_id: int, question_id: int) -> bytes:
     q = get_question_adapter(survey_id, question_id)
-    if not q:
-        raise ValueError("问题不存在")
+    answers = get_answers_list_adapter(survey_id, question_id)
 
-    weights = calculate_tfidf_weights(survey_id, question_id)
-
-    if not weights:
+    # 无人作答
+    if not answers:
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "数据不足或无有效文本，无法生成词云",
-                ha="center", va="center", fontsize=12)
+        ax.text(0.5, 0.5, "暂无作答，无法生成词云", ha="center", va="center")
         ax.axis("off")
         return _fig_to_png(fig)
 
-    wc = WordCloud(
+    tfidf_weights = calculate_tfidf_weights(survey_id, question_id)
+
+    # 作答存在，但无语义内容
+    if not tfidf_weights:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.text(
+            0.5, 0.5,
+            "回答内容过于简短或无语义，无法生成词云",
+            ha="center", va="center"
+        )
+        ax.axis("off")
+        return _fig_to_png(fig)
+
+    wc_params = dict(
         width=800,
         height=500,
         background_color="white",
         max_words=50,
         prefer_horizontal=0.9,
-        font_path=WC_FONT_PATH  # 依赖 matplotlib 全局字体
-    ).generate_from_frequencies(weights)
+    )
+
+    if WC_FONT_PATH:
+        wc_params["font_path"] = WC_FONT_PATH
+
+    wc = WordCloud(**wc_params).generate_from_frequencies(tfidf_weights)
 
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.imshow(wc, interpolation="bilinear")
     ax.axis("off")
-    ax.set_title(f"{q['question_text']} (TF-IDF 词云图)")
-    plt.tight_layout()
+    ax.set_title(f"{q['question_text']}（词云）")
     return _fig_to_png(fig)
 
 
 # =====================================================
 # 选择题统计图
 # =====================================================
+
 def aggregate_choice_counts(survey_id: int, question_id: int):
     options = get_options_adapter(question_id)
-    opt_map = {o["option_text"]: o["option_text"] for o in options}
-
     counts = {o["option_text"]: 0 for o in options}
     counts["其他"] = 0
 
@@ -203,7 +237,7 @@ def aggregate_choice_counts(survey_id: int, question_id: int):
         parts = [p.strip() for p in a.replace(";", ",").split(",") if p.strip()]
         matched = False
         for p in parts:
-            if p in opt_map:
+            if p in counts:
                 counts[p] += 1
                 matched = True
         if not matched and parts:
@@ -216,62 +250,43 @@ def aggregate_choice_counts(survey_id: int, question_id: int):
 
 def generate_pie_chart(survey_id: int, question_id: int) -> bytes:
     q = get_question_adapter(survey_id, question_id)
-    counts = aggregate_choice_counts(survey_id, question_id)
-    data = {k: v for k, v in counts.items() if v > 0}
+    counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id).items() if v > 0}
 
-    if not data:
+    if not counts:
         fig, ax = plt.subplots()
         ax.text(0.5, 0.5, "暂无数据", ha="center", va="center")
         ax.axis("off")
         return _fig_to_png(fig)
 
     fig, ax = plt.subplots(figsize=(10, 8))
-    wedges, _, _ = ax.pie(
-        data.values(),
-        autopct="%1.1f%%",
-        startangle=90,
-        radius=0.7
-    )
-
-    ax.legend(
-        wedges,
-        data.keys(),
-        title="选项",
-        loc="center left",
-        bbox_to_anchor=(1, 0, 0.5, 1)
-    )
-
-    ax.set_title(f"{q['question_text']} (饼图)")
+    wedges, *_ = ax.pie(counts.values(), autopct="%1.1f%%", startangle=90)
+    ax.legend(wedges, counts.keys(), loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+    ax.set_title(f"{q['question_text']}（饼图）")
     ax.axis("equal")
     return _fig_to_png(fig)
 
 
 def generate_bar_chart(survey_id: int, question_id: int, horizontal=False) -> bytes:
     q = get_question_adapter(survey_id, question_id)
-    counts = aggregate_choice_counts(survey_id, question_id)
-    data = {k: v for k, v in counts.items() if v > 0}
+    counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id).items() if v > 0}
 
-    if not data:
+    if not counts:
         fig, ax = plt.subplots()
         ax.text(0.5, 0.5, "暂无数据", ha="center", va="center")
         ax.axis("off")
         return _fig_to_png(fig)
 
-    labels = list(data.keys())
-    values = list(data.values())
-    x = range(len(labels))
+    labels = list(counts.keys())
+    values = list(counts.values())
 
     fig, ax = plt.subplots(figsize=(10, 6))
     if horizontal:
-        ax.barh(x, values)
-        ax.set_yticks(x)
-        ax.set_yticklabels(labels)
+        ax.barh(labels, values)
     else:
-        ax.bar(x, values)
-        ax.set_xticks(x)
+        ax.bar(labels, values)
         ax.set_xticklabels(labels, rotation=45, ha="right")
 
-    ax.set_title(f"{q['question_text']} (柱状图)")
+    ax.set_title(f"{q['question_text']}（柱状图）")
     plt.tight_layout()
     return _fig_to_png(fig)
 
@@ -279,6 +294,7 @@ def generate_bar_chart(survey_id: int, question_id: int, horizontal=False) -> by
 def generate_line_chart(survey_id: int, question_id: int) -> bytes:
     q = get_question_adapter(survey_id, question_id)
     options = get_options_adapter(question_id)
+    answers = get_answers_list_adapter(survey_id, question_id)
 
     if not options:
         fig, ax = plt.subplots()
@@ -286,52 +302,38 @@ def generate_line_chart(survey_id: int, question_id: int) -> bytes:
         ax.axis("off")
         return _fig_to_png(fig)
 
-    opt_texts = [o["option_text"] for o in options]
-    answers = get_answers_list_adapter(survey_id, question_id)
-
-    cumulative = {t: [0] for t in opt_texts}
-    current = {t: 0 for t in opt_texts}
-
-    for ans in answers:
-        for t in opt_texts:
-            if t in ans:
-                current[t] += 1
-            cumulative[t].append(current[t])
-
     fig, ax = plt.subplots(figsize=(10, 5))
-    x_axis = range(len(answers) + 1)
+    x = range(len(answers) + 1)
 
-    has_data = False
-    for t in opt_texts:
-        if max(cumulative[t]) > 0:
-            ax.plot(x_axis, cumulative[t], label=t)
-            has_data = True
+    for o in options:
+        t = o["option_text"]
+        y = [0]
+        c = 0
+        for a in answers:
+            if t in a:
+                c += 1
+            y.append(c)
+        if max(y) > 0:
+            ax.plot(x, y, label=t)
 
-    if has_data:
+    if ax.lines:
         ax.legend()
     else:
         ax.text(0.5, 0.5, "暂无数据", ha="center")
 
-    ax.set_title(f"{q['question_text']} (趋势图)")
-    ax.set_xlabel("答卷顺序")
-    ax.set_ylabel("累计数量")
-    plt.tight_layout()
+    ax.set_title(f"{q['question_text']}（趋势图）")
     return _fig_to_png(fig)
 
 
 # =====================================================
 # 统一入口
 # =====================================================
-def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str) -> bytes:
-    if question_id:
-        q = get_question_adapter(survey_id, question_id)
-        if not q:
-            raise ValueError("问题不存在")
-        q_type = q.get("question_type", "").lower()
-    else:
-        q_type = ""
 
-    chart_type = chart_type.lower().strip()
+def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str) -> bytes:
+    q = get_question_adapter(survey_id, question_id) if question_id else None
+    q_type = q["question_type"].lower() if q else "unknown"
+
+    chart_type = chart_type.lower()
 
     if chart_type == "wordcloud":
         if q_type not in ("text", "textarea"):
@@ -345,10 +347,10 @@ def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str)
         if chart_type == "pie":
             return generate_pie_chart(survey_id, question_id)
         if chart_type == "bar":
-            return generate_bar_chart(survey_id, question_id)
+            return generate_bar_chart(survey_id, question_id, False)
         if chart_type == "bar_h":
-            return generate_bar_chart(survey_id, question_id, horizontal=True)
+            return generate_bar_chart(survey_id, question_id, True)
         if chart_type == "line_answer":
             return generate_line_chart(survey_id, question_id)
 
-    raise ValueError(f"不支持的图表类型: {chart_type}")
+    raise ValueError(f"不支持的图表类型：{chart_type}")
