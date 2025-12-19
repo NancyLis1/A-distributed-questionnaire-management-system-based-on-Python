@@ -175,3 +175,11 @@ def undo_survey_submission(sock, user_id: int, survey_id: int):
     需要服务器端实现对应的 db_utils.undo_survey_submission 函数。
     """
     return send_request("undo_survey_submission", {"user_id": user_id, "survey_id": survey_id}, sock=sock)
+def update_user_status(sock, user_id: int, new_status: str) -> bool:
+    """
+    通过网络更新用户状态
+    """
+    return send_request("update_user_status", {
+        "user_id": user_id,
+        "new_status": new_status
+    }, sock=sock)

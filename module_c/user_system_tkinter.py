@@ -693,9 +693,6 @@ class UserSystemApp:
 
         self.create_login_view()
 
-        # 启动后台监听线程
-        self._start_listen_thread()
-
     def _connect_server(self):
         """连接服务器"""
         try:
@@ -762,9 +759,11 @@ class UserSystemApp:
 
         tab_login = ttk.Frame(tab_control)
         tab_register = ttk.Frame(tab_control)
+        tab_delete = ttk.Frame(tab_control)
 
         tab_control.add(tab_login, text='登录')
         tab_control.add(tab_register, text='注册')
+        tab_control.add(tab_delete, text='注销账号')
         tab_control.pack(expand=1, fill='both', padx=50, pady=50)
 
         # --- 登录界面 ---
@@ -788,6 +787,17 @@ class UserSystemApp:
         self.entry_reg_pwd.pack(pady=5)
 
         ttk.Button(tab_register, text="注册", command=self.register_action).pack(pady=20)
+        # --- 注销界面 (新增) ---
+        ttk.Label(tab_delete, text="用户名:").pack(pady=5)
+        self.entry_del_name = ttk.Entry(tab_delete)
+        self.entry_del_name.pack(pady=5)
+        ttk.Label(tab_delete, text="密码:").pack(pady=5)
+        self.entry_del_pwd = ttk.Entry(tab_delete, show="*")
+        self.entry_del_pwd.pack(pady=5)
+        # 使用红色按钮提醒注销风险
+        style = ttk.Style()
+        style.configure("Danger.TButton", foreground="red")
+        ttk.Button(tab_delete, text="确认注销账号", command=self.delete_user_action).pack(pady=20)
 
     def login_action(self):
         name = self.entry_login_name.get()
@@ -843,6 +853,50 @@ class UserSystemApp:
         except Exception as e:
             messagebox.showerror("注册失败", f"可能用户名已存在或网络错误: {e}")
 
+    def delete_user_action(self):
+        name = self.entry_del_name.get()
+        pwd = self.entry_del_pwd.get()
+
+        if not name or not pwd:
+            messagebox.showwarning("提示", "请填写完整信息以确认身份")
+            return
+
+        # 二次确认，防止误点
+        if not messagebox.askyesno("警告", "注销后账号将无法登录，确定要注销吗？"):
+            return
+
+        try:
+            # 1. 验证身份（注销前必须确保用户名和密码正确）
+            user = db_proxy.get_user_by_login(self.sock, name)
+
+            if user and user.get('password') == pwd:
+                user_id = user.get('user_id')
+
+                # 2. 调用 db_proxy 更新状态为 'stop'
+                # 注意：假设 db_proxy 有 update_user_status 或类似修改用户属性的方法
+                # 如果没有直接的 update_user_status，可能需要 db_proxy.update_user(...)
+                res = db_proxy.update_user_status(self.sock, user_id, 'stop')
+
+                # 根据 db_proxy 返回格式判断是否成功
+                is_success = False
+                if isinstance(res, bool):
+                    is_success = res
+                elif isinstance(res, dict):
+                    is_success = (res.get("status") == "success")
+
+                if is_success:
+                    messagebox.showinfo("成功", "账号已注销（状态已设为停止）")
+                    # 清空输入框
+                    self.entry_del_name.delete(0, tk.END)
+                    self.entry_del_pwd.delete(0, tk.END)
+                else:
+                    messagebox.showerror("失败", "注销请求未被服务器接受")
+            else:
+                messagebox.showerror("验证失败", "用户名或密码错误，无法注销")
+
+        except Exception as e:
+            messagebox.showerror("系统错误", f"连接服务器失败: {e}")
+
     def show_dashboard(self):
         """登录成功后切换到 Dashboard"""
         self.login_frame.destroy()
@@ -853,7 +907,6 @@ class UserSystemApp:
 
         if self.is_admin:
             self.master.title(f"问卷系统 - 管理员模式 ({self.current_user_id})")
-
 
 if __name__ == "__main__":
     root = tk.Tk()

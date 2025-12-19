@@ -647,7 +647,17 @@ def get_question_options(question_id: int) -> List[tuple]:
 # ==========================================
 # CRUD实现：Update (更新) & Delete (删除) 接口
 # ==========================================
-
+def update_user_status(user_id: int, new_status: str):
+    """
+    更新用户状态
+    """
+    sql = "UPDATE User SET user_status = ? WHERE user_id = ?"
+    try:
+        execute(sql, (new_status, user_id))
+        return True
+    except Exception as e:
+        print(f"更新用户状态失败: {e}")
+        return False
 # -----------------------------
 # 发布问卷 (修改后：确保提交)
 # -----------------------------
