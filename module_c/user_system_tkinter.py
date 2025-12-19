@@ -679,7 +679,8 @@ class UserSystemApp:
 
         self.current_user_id = None
         self.is_admin = False
-        self.sock: Optional[socket.socket] = None
+        self.sock: Optional[socket.socket] = None  # 业务 socket
+        self.control_sock: Optional[socket.socket] = None  # 控制 socket
 
         # 尝试连接服务器
         if not self._connect_server():
@@ -706,40 +707,45 @@ class UserSystemApp:
                                  f"无法连接服务器 {self.SERVER_HOST}:{self.SERVER_PORT}. 请确保服务器已运行。错误: {e}")
             return False
 
-    def _start_listen_thread(self):
-        """后台线程监听服务器消息（如强制退出）"""
+    # user_system_tkinter.py 内部
 
-        def listen_server_messages():
-            # 监听线程使用较短的超时，以便于轮询和响应退出信号
-            temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if self.sock:
-                temp_sock = self.sock
+    def _start_control_socket(self):
+        """建立控制 socket，用于监听强制下线"""
+        try:
+            self.control_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.control_sock.connect((self.SERVER_HOST, self.SERVER_PORT))
 
+            bind_msg = {
+                "action": "bind_control",
+                "params": {"user_id": self.current_user_id}
+            }
+            self.control_sock.sendall(json.dumps(bind_msg).encode("utf-8"))
+        except Exception as e:
+            print(f"控制通道失败: {e}")
+            return
+
+        def listen():
+            while True:
+                try:
+                    # 移除了 settimeout(0.5)，直接阻塞在这里等待服务端推送
+                    data = self.control_sock.recv(4096)
+                    if not data:
+                        break
+
+                    msg = json.loads(data.decode("utf-8"))
+                    # --- 修改点：这里改为 type == 'kicked' ---
+                    if msg.get("type") == "kicked":
+                        self.master.after(0, lambda m=msg: self._handle_force_logout(m))
+                        break
+                except Exception as e:
+                    print(f"Control Socket Error: {e}")
+                    break
             try:
-                temp_sock.settimeout(0.5)  # 设置非阻塞 / 超时
-                while True:
-                    try:
-                        data = temp_sock.recv(4096)
-                        if data:
-                            msg = json.loads(data.decode("utf-8"))
-                            if msg.get("action") == "force_logout":
-                                self.master.after(0, lambda: self._handle_force_logout(msg))  # 切换到主线程处理 UI
-                                break
-                    except socket.timeout:
-                        pass  # 轮询继续
-                    except ConnectionResetError:
-                        self.master.after(0, lambda: self._handle_connection_reset())
-                        break
-                    except Exception as e:
-                        # 其他连接错误
-                        break
-                    time.sleep(0.1)
-            finally:
-                # 注意：这里不能关闭 self.sock，因为它可能被主线程使用
-                # 只有当程序退出或确认连接完全不可用时才关闭
+                self.control_sock.close()
+            except:
                 pass
 
-        threading.Thread(target=listen_server_messages, daemon=True).start()
+        threading.Thread(target=listen, daemon=True).start()
 
     def _handle_force_logout(self, msg):
         """处理强制退出消息"""
@@ -828,6 +834,15 @@ class UserSystemApp:
                     # 登录成功后，发送登录消息给服务器，关联 Socket 和 User ID
                     login_msg = {"action": "login", "params": {"user_id": self.current_user_id}}
                     self.sock.sendall(json.dumps(login_msg).encode("utf-8"))
+
+                    try:
+                        # 简单读取并丢弃，或者检查是否是 login_ok
+                        self.sock.recv(4096)
+                    except:
+                        pass
+
+                   # ✅ 新增：启动 control socket
+                    self._start_control_socket()
 
                     self.show_dashboard()
                 else:
