@@ -132,7 +132,7 @@ class DashboardView(tk.Frame):
 
         tk.Label(self.controls_frame, text="图表类型:", bg="white").pack(side=tk.LEFT, padx=10)
         self.chart_type_combo = ttk.Combobox(self.controls_frame, state="readonly", width=15,
-                                             values=["pie", "bar", "bar_h", "line_answer", "wordcloud"])
+                                             values=["pie", "bar", "bar_h", "line_answer", "text_answer"])
         self.chart_type_combo.current(0)
         self.chart_type_combo.pack(side=tk.LEFT, padx=5)
 
@@ -444,7 +444,7 @@ class DashboardView(tk.Frame):
 
     def generate_chart(self):
         """
-        【修改】启动线程生成图表
+        【已修改】增加题目类型预判，限制图表/文本报告生成逻辑
         """
         if self.current_list_type == "filled":
             messagebox.showwarning("提示", "您正在查看已填问卷列表，不支持生成图表。")
@@ -462,57 +462,107 @@ class DashboardView(tk.Frame):
         q_id = self.current_questions_map.get(q_label)
         c_type = self.chart_type_combo.get()
         title = self.current_survey_title
-        q_text = q_label  # 用题干作为图表标题的一部分
+        q_text = q_label
+
+        # --- 核心逻辑判断：根据题干中的类型标识限制生成内容 ---
+        # 题干格式通常为 "1. 题目文本 [type]"
+        is_text_type = "[text]" in q_label.lower() or "[textarea]" in q_label.lower()
+
+        if is_text_type:
+            if c_type != "text_answer":
+                messagebox.showwarning("提示", "文本类题目仅支持生成 'text_answer' 文字报告。")
+                return
+        else:
+            if c_type == "text_answer":
+                messagebox.showwarning("提示", "选择类题目请选择饼图、柱状图或趋势图。")
+                return
 
         # 在显示图表前，确保隐藏答案面板
         self.answer_tree_frame.pack_forget()
-        self.chart_label.pack(expand=True, fill=tk.BOTH)  # 重新显示 chart_label
+        self.chart_label.pack(expand=True, fill=tk.BOTH)
         if hasattr(self, 'answers_title_label'):
             self.answers_title_label.pack_forget()
 
-        # 1. 显示加载中的提示
+        # 显示加载状态
         if self.loading_chart_label:
             self.loading_chart_label.destroy()
 
-        self.loading_chart_label = tk.Label(self.chart_label, text="正在生成图表，这可能需要较长时间...",
+        load_msg = "正在生成文字报告..." if is_text_type else "正在生成图表..."
+        self.loading_chart_label = tk.Label(self.chart_label, text=load_msg,
                                             font=('Arial', 14), bg="#EEEEEE")
         self.loading_chart_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
-        # 2. 启动线程进行图表生成
+        # 启动线程进行处理
         threading.Thread(target=self._generate_chart_thread, args=(q_id, c_type, title, q_text)).start()
-
     def _generate_chart_thread(self, q_id: int, c_type: str, title: str, q_text: str):
         """
-        [新增] 在后台线程中执行图表生成 I/O 和计算
+        [修改] result 现在可能是 PhotoImage 或 String (报告文本)
         """
-        photo: Optional[tk.PhotoImage] = None
+        result: Any = None
         error_msg: Optional[str] = None
         try:
-            # 耗时的 I/O 和计算
-            photo = generate_chart_image(self.current_survey_id, q_id, c_type, sock=self.sock)
+            # 这里的 generate_chart_image 内部会根据 c_type 调用不同的后端逻辑
+            result = generate_chart_image(self.current_survey_id, q_id, c_type, sock=self.sock)
         except Exception as e:
             error_msg = f"生成失败: {e}"
 
-        # 线程完成后，使用 after 安全地回到主线程更新 UI
-        self.master.after(0, self._display_chart_ui, photo, error_msg, title, q_text)
+        # 传递 c_type 以便 UI 线程判断如何渲染
+        self.master.after(0, self._display_chart_ui_flexible, result, error_msg, title, q_text, c_type)
 
-    def _display_chart_ui(self, photo: Optional[tk.PhotoImage], error_msg: Optional[str], title: str, q_text: str):
+    def _display_chart_ui_flexible(self, result: Any, error_msg: Optional[str], title: str, q_text: str, c_type: str):
         """
-        [新增] 在主线程中显示图表或错误信息
+        修正后的渲染函数：
+        1. 彻底清除之前的 image 引用
+        2. 根据 c_type 决定是更新 Label 的 text 还是 image
         """
-        # 移除加载提示
         if self.loading_chart_label:
             self.loading_chart_label.destroy()
 
         if error_msg:
-            self.chart_label.config(image="", text=f"无法生成图表: {error_msg}", fg="red")
+            self.chart_label.config(image="", text=f"无法处理: {error_msg}", fg="red")
             self.chart_image_ref = None
             return
 
-        # 更新图表
-        self.chart_label.config(image=photo, text=f"问卷: {title}\n题目: {q_text}", compound="top", fg="black")
-        self.chart_image_ref = photo  # 保持引用
+        # 重要：每次更新前先重置 Label 状态，防止旧图片干扰
+        self.chart_label.config(image="", text="")
 
+        if c_type == "text_answer":
+            # --- 情况 A: 处理文字报告 ---
+            # 此时 result 是后端传来的 bytes 或 str
+            try:
+                report_content = result.decode('utf-8') if isinstance(result, bytes) else str(result)
+            except Exception:
+                report_content = str(result)
+
+            full_report = f"问卷: {title}\n题目: {q_text}\n\n{report_content}"
+
+            self.chart_label.config(
+                text=full_report,
+                fg="black",
+                font=("Consolas", 11),  # 等宽字体适合打印报告
+                justify=tk.LEFT,
+                anchor="nw",  # 文本从左上角开始排版
+                padx=20,
+                pady=20,
+                compound="none"  # 确保不尝试显示图片
+            )
+            self.chart_image_ref = None  # 清空图片引用
+
+        else:
+            # --- 情况 B: 处理图像图表 ---
+            # 此时 result 必须是已经转换好的 PhotoImage 对象
+            # 如果 generate_chart_image 返回的是 bytes，这里需要先转 PhotoImage
+
+            self.chart_image_ref = result  # 保持引用防止 GC
+            self.chart_label.config(
+                image=result,
+                text=f"问卷: {title}\n题目: {q_text}",
+                compound="top",  # 图片在上，标题在下
+                fg="black",
+                font=("Arial", 10),
+                justify=tk.CENTER,
+                anchor="center"  # 图片居中显示
+            )
     def open_fill_survey(self):
         """点击填写问卷 → 打开填写问卷主界面"""
         # 确保 FillSurveyMainWindow 接收并存储 self.sock
@@ -706,8 +756,6 @@ class UserSystemApp:
             return
 
         try:
-            # 【替换】使用 db_proxy
-            # 假设服务端负责哈希，这里直接发送明文
             db_proxy.add_user(self.sock, user_name=name, password=pwd, user_status='active', unban_time=None)
             messagebox.showinfo("注册成功", "注册成功，请登录")
         except Exception as e:

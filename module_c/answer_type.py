@@ -6,7 +6,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import jieba
 from sklearn.feature_extraction.text import TfidfVectorizer
-from wordcloud import WordCloud
 from typing import List, Dict, Optional
 import socket # 引入 socket 类型提示，虽然是 Optional[object]
 
@@ -37,38 +36,6 @@ except ImportError:
 # Matplotlib：简单、稳定
 plt.rcParams['font.family'] = 'SimHei'
 plt.rcParams['axes.unicode_minus'] = False
-
-
-def get_wc_font_path():
-    """
-    WordCloud 专用字体路径，多平台兜底
-    """
-    candidates = []
-
-    system = platform.system()
-    if system == "Windows":
-        candidates = [
-            r"C:/Windows/Fonts/simhei.ttf",
-            r"C:/Windows/Fonts/msyh.ttc",
-        ]
-    elif system == "Darwin":
-        candidates = [
-            "/System/Library/Fonts/PingFang.ttc",
-        ]
-    else:  # Linux / Docker
-        candidates = [
-            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-        ]
-
-    for p in candidates:
-        if os.path.exists(p):
-            return p
-    return None
-
-
-WC_FONT_PATH = get_wc_font_path()
-# ... (DEBUG 代码保持不变) ...
-
 
 def _fig_to_png(fig: plt.Figure) -> bytes:
     buf = io.BytesIO()
@@ -120,29 +87,40 @@ def get_answers_list_adapter(survey_id: int, question_id: int, sock: Optional[so
 
 
 def get_options_adapter(question_id: int, sock: Optional[socket.socket] = None) -> List[Dict]:
-    # -----------------------------------------------
-    # 关键修正 3: 使用 db_proxy
-    # -----------------------------------------------
     raw = db_proxy.get_question_options(sock, question_id)
-    # 假设 get_question_options 返回的是 [(id, text), ...] 列表
-    # 如果 db_proxy 返回的是 [{...}, ...]，则需要根据实际结构调整
     if not raw:
         return []
 
-    if isinstance(raw[0], tuple):
-        # 兼容旧的 (id, text) 格式
-        return [{"option_text": t, "option_index": i + 1} for i, (_, t) in enumerate(raw)]
-    elif isinstance(raw[0], dict):
-         # 如果 db_proxy 返回的是字典列表，例如 [{'option_id': 1, 'option_text': 'A'}, ...]
-         return [{"option_text": item['option_text'], "option_index": i + 1} for i, item in enumerate(raw)]
-    return []
+    processed_options = []
+    for i, item in enumerate(raw):
+        option_text = ""
 
+        # 情况 1: 元组格式 (id, text)
+        if isinstance(item, (tuple, list)) and len(item) >= 2:
+            option_text = item[1]
 
+        # 情况 2: 字典格式 (最可能出问题的地方)
+        elif isinstance(item, dict):
+            # 尝试所有可能的后端字段名
+            option_text = (item.get('option_text') or
+                           item.get('content') or
+                           item.get('text') or
+                           item.get('option_content') or "")
+
+        # 情况 3: 直接是字符串
+        elif isinstance(item, str):
+            option_text = item
+
+        if option_text:
+            processed_options.append({
+                "option_text": str(option_text).strip(),
+                "option_index": i + 1
+            })
+
+    return processed_options
 # =====================================================
-# 词云 / TF-IDF 核心逻辑 (修改调用)
+# TF-IDF 核心逻辑
 # =====================================================
-
-# (jieba_tokenizer 和 SIMPLE_STOPWORDS 保持不变)
 
 SIMPLE_STOPWORDS = {
     '的', '是', '了', '和', '在', '我', '你', '它', '这', '那',
@@ -152,29 +130,19 @@ SIMPLE_STOPWORDS = {
 
 
 def jieba_tokenizer(text: str) -> List[str]:
-    words = jieba.lcut(text.lower())
-    results = []
+    # 1. 清洗数据：去除首尾空格
+    clean_text = text.strip()
 
-    for w in words:
-        w = w.strip()
-        if len(w) <= 1 or w in SIMPLE_STOPWORDS:
-            continue
+    # 2. 过滤掉空字符串（防止空回答干扰统计）
+    if not clean_text:
+        return []
 
-        # 中文
-        if any('\u4e00' <= c <= '\u9fa5' for c in w):
-            results.append(w)
-
-        # 字母 / 字母数字混合（如 A888）
-        elif w.isalnum() and not w.isdigit():
-            results.append(w)
-
-    return results
+    # 3. 返回包含完整文本的列表，不再拆分“付”和“美育”
+    return [clean_text]
 
 
 def calculate_tfidf_weights(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> Dict[str, float]:
-    # -----------------------------------------------
-    # 关键修正 3: 传递 sock
-    # -----------------------------------------------
+    """计算 TF-IDF 权重"""
     answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
     if not answers:
         return {}
@@ -213,56 +181,31 @@ def calculate_tfidf_weights(survey_id: int, question_id: int, sock: Optional[soc
 
     return dict(sorted(tfidf_dict.items(), key=lambda x: x[1], reverse=True))
 
-
-def generate_tfidf_wordcloud(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> bytes:
-    # -----------------------------------------------
-    # 关键修正 3: 传递 sock
-    # -----------------------------------------------
-    q = get_question_adapter(survey_id, question_id, sock=sock)
+def get_text_tfidf_list(survey_id: int, question_id: int, sock: Optional[socket.socket] = None) -> str:
+    """
+    计算文本题的 TF-IDF 权重，并返回格式化的纯文本报告。
+    """
+    tfidf_weights = calculate_tfidf_weights(survey_id, question_id, sock=sock)
     answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
 
-    # ... (绘图逻辑保持不变) ...
-
-    # 无人作答
     if not answers:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "暂无作答，无法生成词云", ha="center", va="center")
-        ax.axis("off")
-        return _fig_to_png(fig)
+        return "暂无作答内容。"
 
-    tfidf_weights = calculate_tfidf_weights(survey_id, question_id, sock=sock)
-
-    # ... (绘图逻辑保持不变) ...
-
-    # 作答存在，但无语义内容
     if not tfidf_weights:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(
-            0.5, 0.5,
-            "回答内容过于简短或无语义，无法生成词云",
-            ha="center", va="center"
-        )
-        ax.axis("off")
-        return _fig_to_png(fig)
+        return "回答内容过于简短或无语义，无法生成分析报告。"
 
-    wc_params = dict(
-        width=800,
-        height=500,
-        background_color="white",
-        max_words=50,
-        prefer_horizontal=0.9,
-    )
+    # 格式化输出为字符串
+    output_lines = ["--- 文本题词频分析报告 (TF-IDF 权重降序) ---"]
+    output_lines.append(f"总有效回答数: {len(answers)}")
+    output_lines.append("------------------------------------------------")
 
-    if WC_FONT_PATH:
-        wc_params["font_path"] = WC_FONT_PATH
+    for i, (word, score) in enumerate(tfidf_weights.items()):
+        if i >= 50:  # 限制输出前 50 个高频词
+            break
+        output_lines.append(f"【{word}】: 权重 {score:.4f}")
 
-    wc = WordCloud(**wc_params).generate_from_frequencies(tfidf_weights)
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.imshow(wc, interpolation="bilinear")
-    ax.axis("off")
-    ax.set_title(f"{q['question_text']}（词云）")
-    return _fig_to_png(fig)
+    report_str = "\n".join(output_lines)
+    return report_str.encode('utf-8')
 
 
 # =====================================================
@@ -276,28 +219,31 @@ def aggregate_choice_counts(survey_id: int, question_id: int, sock: Optional[soc
 
     # 2. 获取选项列表
     options_text_list = []
-    if q_type == "slide":  # 或 "slider", 取决于数据库中实际存储的类型
+    if q_type == "slider":  # 或 "slider", 取决于数据库中实际存储的类型
         # 针对 Slider 题型，强制使用 1 到 10 的选项文本
         options_text_list = [str(i) for i in range(1, 11)]
     else:
         # 其他题型，从数据库获取选项
         options = get_options_adapter(question_id, sock=sock)
         options_text_list = [o["option_text"] for o in options]
+        for o in options:
+            # 兼容多种可能的字段名：option_text, content, text
+            text = o.get("option_text") or o.get("content") or o.get("text")
+            if text:
+                options_text_list.append(str(text).strip())
 
     # 3. 初始化计数器
     counts = {o: 0 for o in options_text_list}
     counts["其他"] = 0
 
     answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
-
-    # 4. 遍历回答进行计数
     for a in answers:
         # 注意：对于 slider，a 应该是一个单一数字字符串，例如 '5'
         # 但我们仍然使用 split "," 来兼容选择题
         parts = [p.strip() for p in a.replace(";", ",").split(",") if p.strip()]
 
         # 兼容 slider 只有一个回答值的情况
-        if q_type == "slide" and len(parts) == 1 and parts[0] in counts:
+        if q_type == "slider" and len(parts) == 1 and parts[0] in counts:
             counts[parts[0]] += 1
             continue  # 处理下一个回答
 
@@ -419,13 +365,14 @@ def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str,
 
     chart_type = chart_type.lower()
 
-    if chart_type == "wordcloud":
+    if chart_type == "text_answer":
         if q_type not in ("text", "textarea"):
-            raise ValueError("仅文本题支持词云")
-        return generate_tfidf_wordcloud(survey_id, question_id, sock=sock)
+            raise ValueError("仅文本题支持text_answer")
+        return get_text_tfidf_list(survey_id, question_id, sock=sock)
+        return result.encode('utf-8') if isinstance(result, str) else result
 
     if chart_type in ("pie", "bar", "bar_h", "line_answer"):
-        if q_type not in ("choice", "radio", "checkbox", "slide"):
+        if q_type not in ("choice", "radio", "checkbox", "slider"):
             raise ValueError("仅选择题支持统计图")
 
         if chart_type == "pie":
