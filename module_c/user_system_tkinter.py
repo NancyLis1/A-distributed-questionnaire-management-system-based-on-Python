@@ -109,6 +109,17 @@ class DashboardView(tk.Frame):
         # 绑定点击事件
         self.tree.bind("<<TreeviewSelect>>", self.on_survey_select)
 
+        # 绑定右键菜单事件 (Windows/Linux 使用 <Button-3>, macOS 使用 <Button-2>)
+        self.tree.bind("<Button-3>", self.show_context_menu)
+
+        # 创建右键菜单
+        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="🚀 发布", command=self.action_publish)
+        self.context_menu.add_command(label="⏸ 暂停", command=self.action_pause)
+        self.context_menu.add_command(label="▶ 恢复", command=self.action_resume)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="🗑 删除", command=self.action_delete)
+
         # --- 右侧：内容容器 (图表/答案) ---
         self.right_frame = tk.Frame(self.paned_win, bg="white")
         self.paned_win.add(self.right_frame)
@@ -253,7 +264,7 @@ class DashboardView(tk.Frame):
                         surveys.append(survey_detail)
 
             elif list_type == "mine":
-                surveys = db_proxy.get_public_surveys_by_user_id(self.sock, self.user_id)
+                surveys = db_proxy.get_all_surveys_by_user_id(self.sock, self.user_id)
                 if surveys is None: surveys = []
 
         except Exception as e:
@@ -261,6 +272,77 @@ class DashboardView(tk.Frame):
 
         # 3. 线程完成后，使用 after 安全地回到主线程更新 UI
         self.master.after(0, self._update_surveys_ui, surveys, error_msg, list_type)
+
+    def show_context_menu(self, event):
+        """显示右键菜单"""
+        # 仅在“我创建的问卷”列表下才允许操作
+        if self.current_list_type != "mine":
+            return
+
+        # 选中右键点击所在的行
+        item_id = self.tree.identify_row(event.y)
+        if item_id:
+            self.tree.selection_set(item_id)
+            self.context_menu.post(event.x_root, event.y_root)
+
+    def _update_survey_status(self, target_status, allowed_statuses, action_name):
+        """
+        核心逻辑：对应你报错中缺失的那个方法名
+        """
+        selected = self.tree.selection()
+        if not selected:
+            return
+
+        item = self.tree.item(selected[0])
+        # values 顺序: (ID, 标题, 状态, 创建者)
+        survey_id = item['values'][0]
+        current_status = item['values'][2]
+
+        # 状态检查
+        if current_status not in allowed_statuses:
+            messagebox.showwarning("提示", f"当前状态为 '{current_status}'，无法执行 '{action_name}' 操作。")
+            return
+
+        if messagebox.askyesno("确认", f"确定要{action_name}问卷 ID:{survey_id} 吗？"):
+            try:
+                # 调用 db_proxy 接口
+                res = db_proxy.update_survey_status(self.sock, int(survey_id), target_status)
+
+                # 调试打印：如果你想看 result 到底是什么，取消下面这行的注释
+                # print(f"DEBUG: Server returned: {res}")
+
+                # 判断逻辑：兼容布尔值和字典返回
+                is_success = False
+                if isinstance(res, bool):
+                    is_success = res
+                elif isinstance(res, dict):
+                    is_success = (res.get("status") == "success" or res.get("success") is True)
+                elif res is not None:
+                    is_success = True
+
+                if is_success:
+                    messagebox.showinfo("成功", f"问卷已成功执行: {action_name}")
+                    self.load_surveys("mine")  # 刷新列表
+                else:
+                    messagebox.showerror("失败", "服务器处理请求失败。")
+            except Exception as e:
+                messagebox.showerror("系统错误", f"通讯异常: {e}")
+
+    def action_publish(self):
+        """发布：draft -> active"""
+        self._update_survey_status("active", ["draft"], "发布")
+
+    def action_pause(self):
+        """暂停：active -> stop"""
+        self._update_survey_status("stop", ["active"], "暂停")
+
+    def action_resume(self):
+        """恢复：stop -> active"""
+        self._update_survey_status("active", ["stop"], "恢复")
+
+    def action_delete(self):
+        """删除：active -> closed"""
+        self._update_survey_status("closed", ["active", "stop", "draft"], "删除")
 
     def _update_surveys_ui(self, surveys: List[Dict[str, Any]], error_msg: Optional[str], list_type: str):
         """

@@ -439,6 +439,28 @@ def get_public_surveys() -> List[Dict[str, Any]]:
         result.append(dict(row))
     return result
 
+def get_all_surveys_by_user_id(user_id: int) -> List[Dict[str, Any]]:
+    """
+    根据用户ID获取该用户发布的所有问卷，不论其状态如何。
+    """
+    # 去掉了 WHERE 子句中对 survey_status 的限制
+    sql = """
+        SELECT survey_id, survey_title, created_by, release_time, survey_status, created_at
+        FROM Survey
+        WHERE created_by = ? AND survey_status != 'closed'
+        ORDER BY created_at DESC
+    """
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(sql, (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    # 转换为字典列表
+    return [dict(row) for row in rows]
+
 def get_public_surveys_by_user_id(user_id: int) -> List[Dict[str, Any]]:
     """
     根据用户ID获取该用户发布的所有 active 状态问卷。

@@ -59,6 +59,9 @@ def get_full_survey_detail(sock, survey_id: int) -> Optional[Dict[str, Any]]:
 def get_public_surveys(sock) -> List[Dict[str, Any]]:
     return send_request("get_public_surveys", sock=sock)
 
+def get_all_surveys_by_user_id(sock, user_id: int) -> List[Dict[str, Any]]:
+    return send_request("get_all_surveys_by_user_id", {"user_id": user_id}, sock=sock)
+
 def get_public_surveys_by_user_id(sock, user_id: int) -> List[Dict[str, Any]]:
     return send_request("get_public_surveys_by_user_id", {"user_id": user_id}, sock=sock)
 
