@@ -39,7 +39,7 @@ def hash_password(pwd: str) -> str:
 # ==========================================
 
 # -----------------------------
-# 1.用户表（已修改，使得其能接受password参数）
+# 1.用户表
 # -----------------------------
 def add_user(user_name: str, password: str, user_status: str = "active", unban_time: Optional[str] = None) -> int:
     """新增用户，返回 user_id"""
@@ -56,7 +56,7 @@ def add_user(user_name: str, password: str, user_status: str = "active", unban_t
     return user_id
 
 # -----------------------------
-# 2.问卷表（已修改：适应新增的 survey_title 字段）
+# 2.问卷表
 # -----------------------------
 def add_survey(created_by: int, survey_title: str, survey_status: str = "draft", release_time: Optional[str] = None) -> int:
     """
@@ -133,7 +133,7 @@ def add_answer_survey_history(user_id: int, survey_id: int) -> int:
 
 
 # -----------------------------
-# 6.答案表 (增强健壮性)
+# 6.答案表
 # -----------------------------
 def add_answer(user_id: int, survey_id: int, question_id: int, answer_content: str) -> int:
     survey = get_survey(survey_id)
@@ -317,7 +317,7 @@ def get_survey(survey_id: int) -> Optional[Dict[str, Any]]:
 
 def get_user_survey_answers_detail(survey_id: int, user_id: int) -> List[Dict[str, Any]]:
     """
-    【新增功能】获取指定用户对指定问卷的详细答案列表，用于在UI中显示。
+    获取指定用户对指定问卷的详细答案列表，用于在UI中显示。
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -592,7 +592,7 @@ def get_surveys_filled_by_user(user_id: int):
 
 
 # -----------------------------
-# 违规管理 - 查询接口 (供 管理员界面/C模块 使用)
+# 违规管理 - 查询接口 (供管理员界面/C模块 使用)
 # -----------------------------
 def get_all_violations() -> List[Dict[str, Any]]:
     """
@@ -772,7 +772,6 @@ def delete_option(option_id: int):
     execute(sql, (option_id,))
 
 
-# db_utils.py
 
 def copy_question(survey_id: int, source_question_id: int):
     """
@@ -840,7 +839,6 @@ def undo_survey_submission(user_id: int, survey_id: int):
 
     try:
         # 1. 查找最近的、由该用户提交的、针对该问卷的记录
-        # 注意：由于网络问题可能导致重复提交，我们删除所有匹配的记录以确保清理干净。
 
         # 查找所有待删除的 history_id
         cursor.execute("""

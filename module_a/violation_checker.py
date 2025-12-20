@@ -11,7 +11,7 @@ class ViolationChecker:
         """
         从同级目录下的 banned_words.txt 加载敏感词
         """
-        # 1. 获取当前脚本 (violation_checker.py) 所在的绝对目录
+        # 1. 获取当前脚本
         current_dir = os.path.dirname(os.path.abspath(__file__))
 
         # 2. 拼接出 txt 文件的完整路径

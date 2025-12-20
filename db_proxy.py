@@ -168,7 +168,7 @@ def add_full_survey_submission(sock, user_id: int, survey_id: int, answers: List
         "answers": answers
     }, sock=sock)
 
-# 🚀 新增函数：用于在网络失败时清除可能存在的半成品提交记录
+# 用于在网络失败时清除可能存在的半成品提交记录
 def undo_survey_submission(sock, user_id: int, survey_id: int):
     """
     清除指定用户对指定问卷的提交记录（用于处理超时）。

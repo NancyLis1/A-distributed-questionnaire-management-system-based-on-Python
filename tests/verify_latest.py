@@ -1,4 +1,3 @@
-# tests/verify_latest.py
 import os
 import sys
 import json

@@ -377,7 +377,7 @@ class SurveyEditorWindow(tk.Toplevel):
         # 顶部标题
         tk.Label(right_panel, text="添加题目", font=("Arial", 16, "bold"), bg="white", pady=20).pack()
 
-        # >>> 修改部分：使用 Grid 布局 + 增大按钮 + 右移容器 <<<
+        # 使用 Grid 布局 + 增大按钮 + 右移容器 <<<
 
         # 1. 基础题型
         tk.Label(right_panel, text="添加基础题型", font=("Arial", 10), fg="gray", bg="white").pack(anchor="w",
@@ -468,15 +468,15 @@ class SurveyEditorWindow(tk.Toplevel):
         data = get_full_survey_detail(self.survey_id)
         new_index = len(data['questions']) + 1
 
-        # 1. 在字典里增加 slider 的默认标题
+        # 1. 在字典里增加默认标题
         default_titles = {
             "choice": "单选题",
             "checkbox": "多选题",
             "text": "填空题",
-            "slider": "评分题 (1-10)"  # <--- 新增默认标题
+            "slider": "评分题 (1-10)"
         }
 
-        # 2. 插入问题 (数据库中 type 字段将被存为 'slider')
+        # 2. 插入问题
         q_id = add_question(self.survey_id, new_index, default_titles[q_type], q_type)
 
         # 3. 处理选项逻辑
@@ -486,7 +486,7 @@ class SurveyEditorWindow(tk.Toplevel):
             add_option(q_id, 2, "选项2")
 
         elif q_type == "slider":
-            # 【核心修改】滑动条：自动生成 1 到 10 的选项
+            # 滑动条：自动生成 1 到 10 的选项
             # 这样成员 B 获取 get_full_survey_detail 时，options 列表里就是 ["1", "2", ..., "10"]
             for i in range(1, 11):
                 add_option(q_id, i, str(i))
