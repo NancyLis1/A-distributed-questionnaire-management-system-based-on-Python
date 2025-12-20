@@ -38,7 +38,7 @@ class DashboardView(tk.Frame):
         # 3. 底部中心的两个按钮（创建问卷 + 填写问卷）
         # ============================================
 
-        # 左侧：填写问卷按钮 ✅
+        # 左侧：填写问卷按钮
         self.fill_btn = tk.Button(
             self.bottom_bar,
             text="✍ 填写问卷",
@@ -49,10 +49,10 @@ class DashboardView(tk.Frame):
             activeforeground="white",
             relief="raised",
             cursor="hand2",
-            command=self.open_fill_survey  # ✅ 新增方法
+            command=self.open_fill_survey
         )
 
-        # 右侧：创建问卷按钮（你原来的）
+        # 右侧：创建问卷按钮
         self.create_btn = tk.Button(
             self.bottom_bar,
             text="＋ 创建问卷",
@@ -66,16 +66,12 @@ class DashboardView(tk.Frame):
             command=self.open_editor
         )
 
-        # ✅ 左右对称放置
         self.fill_btn.place(relx=0.35, rely=0.5, anchor="center", width=150, height=50)
         self.create_btn.place(relx=0.65, rely=0.5, anchor="center", width=150, height=50)
 
     def open_fill_survey(self):
         """点击填写问卷 → 打开填写问卷主界面，并关闭当前面板"""
-        # ✅ 打开填写问卷的 MainWindow
         FillSurveyMainWindow(self.master, self.user_id,self.sock)
-
-
 
     def open_editor(self):
         """点击按钮，跳转到 A 的问卷创建界面"""

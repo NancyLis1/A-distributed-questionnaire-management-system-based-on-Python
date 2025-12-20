@@ -2,9 +2,8 @@ import io
 import sys
 import os
 from PIL import Image, ImageTk
-from typing import Optional,Any  # 引入 Optional 用于类型注解
+from typing import Optional,Any
 
-# 确保能引用到同级目录的 answer_type
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
@@ -20,7 +19,6 @@ CHART_TYPES_NEED_QUESTION_ID = {
 def generate_chart_image(survey_id: int, question_id: int, chart_type: str,
                          sock: Optional[object] = None) -> Any:
     """
-    修改后的函数：
     - 如果是 text_answer，直接返回字节流或字符串。
     - 如果是统计图，才返回 PhotoImage。
     """

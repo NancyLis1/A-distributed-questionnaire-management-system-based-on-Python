@@ -149,7 +149,6 @@ def calculate_tfidf_weights(survey_id: int, question_id: int, sock: Optional[soc
 
     processed = [" ".join(jieba_tokenizer(a)) for a in answers]
 
-    # ⭐ 关键修复 1：过滤空文本
     processed = [p for p in processed if p.strip()]
     if not processed:
         return {}
@@ -175,7 +174,6 @@ def calculate_tfidf_weights(survey_id: int, question_id: int, sock: Optional[soc
 
     tfidf_dict = {}
     for word, score in zip(feature_names, scores):
-        # ⭐ 关键修复 2：过滤空 token
         if word and score > 0:
             tfidf_dict[word] = score
 
@@ -213,13 +211,13 @@ def get_text_tfidf_list(survey_id: int, question_id: int, sock: Optional[socket.
 # =====================================================
 
 def aggregate_choice_counts(survey_id: int, question_id: int, sock: Optional[socket.socket] = None):
-    # 1. 获取问题类型 (新增)
+    # 1. 获取问题类型
     q = get_question_adapter(survey_id, question_id, sock=sock)
     q_type = q["question_type"].lower() if q else "unknown"
 
     # 2. 获取选项列表
     options_text_list = []
-    if q_type == "slider":  # 或 "slider", 取决于数据库中实际存储的类型
+    if q_type == "slider":
         # 针对 Slider 题型，强制使用 1 到 10 的选项文本
         options_text_list = [str(i) for i in range(1, 11)]
     else:
@@ -238,16 +236,13 @@ def aggregate_choice_counts(survey_id: int, question_id: int, sock: Optional[soc
 
     answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
     for a in answers:
-        # 注意：对于 slider，a 应该是一个单一数字字符串，例如 '5'
-        # 但我们仍然使用 split "," 来兼容选择题
         parts = [p.strip() for p in a.replace(";", ",").split(",") if p.strip()]
 
-        # 兼容 slider 只有一个回答值的情况
         if q_type == "slider" and len(parts) == 1 and parts[0] in counts:
             counts[parts[0]] += 1
             continue  # 处理下一个回答
 
-        # 兼容 choice/checkbox/radio 的逻辑
+        # 兼容 choice/checkbox 的逻辑
         matched = False
         for p in parts:
             if p in counts:
@@ -266,9 +261,6 @@ def generate_pie_chart(survey_id: int, question_id: int, sock: Optional[socket.s
     # -----------------------------------------------
     q = get_question_adapter(survey_id, question_id, sock=sock)
     counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id, sock=sock).items() if v > 0}
-
-    # ... (绘图逻辑保持不变) ...
-
     if not counts:
         fig, ax = plt.subplots()
         ax.text(0.5, 0.5, "暂无数据", ha="center", va="center")
@@ -289,8 +281,6 @@ def generate_bar_chart(survey_id: int, question_id: int, horizontal: bool = Fals
     # -----------------------------------------------
     q = get_question_adapter(survey_id, question_id, sock=sock)
     counts = {k: v for k, v in aggregate_choice_counts(survey_id, question_id, sock=sock).items() if v > 0}
-
-    # ... (绘图逻辑保持不变) ...
 
     if not counts:
         fig, ax = plt.subplots()
@@ -320,8 +310,6 @@ def generate_line_chart(survey_id: int, question_id: int, sock: Optional[socket.
     q = get_question_adapter(survey_id, question_id, sock=sock)
     options = get_options_adapter(question_id, sock=sock)
     answers = get_answers_list_adapter(survey_id, question_id, sock=sock)
-
-    # ... (绘图逻辑保持不变) ...
 
     if not options:
         fig, ax = plt.subplots()
@@ -357,9 +345,7 @@ def generate_line_chart(survey_id: int, question_id: int, sock: Optional[socket.
 # =====================================================
 
 def get_chart_bytes(survey_id: int, question_id: Optional[int], chart_type: str, sock: Optional[socket.socket] = None) -> bytes:
-    # -----------------------------------------------
-    # 关键修正 3: 传递 sock
-    # -----------------------------------------------
+
     q = get_question_adapter(survey_id, question_id, sock=sock) if question_id else None
     q_type = q["question_type"].lower() if q else "unknown"
 

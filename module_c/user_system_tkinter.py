@@ -11,7 +11,6 @@ from typing import Optional, Dict, List, Any
 # =====================================================
 # 导入 db_proxy 替代 db_utils
 # =====================================================
-# 假设 db_proxy.py 在当前目录或已在 sys.path 中
 try:
     # 导入同级或上级目录的 db_proxy
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -22,24 +21,16 @@ try:
 
     import db_proxy  # <-- 导入 db_proxy
 
-    # 引入其他模块（保持不变）
-    # 假设结构是 ../module_a/ui_editor_treading.py
     sys.path.append(os.path.join(parent_dir, "module_a"))
-    from ui_editor_treading import SurveyEditorWindow  # 导入 A 的编辑器
+    from ui_editor_treading import SurveyEditorWindow
 
-    # 假设结构是 ../module_b/fill_survey_gui_treading.py
     sys.path.append(os.path.join(parent_dir, "module_b"))
     from fill_survey_gui_treading import MainWindow as FillSurveyMainWindow
 
-    from generate_chart_window import generate_chart_image  # 导入图表生成
+    from generate_chart_window import generate_chart_image
 
 except ImportError as e:
-    # 移除 sys.exit(1) 以便在 IDE 中更好地调试
     print(f"导入错误: 请确保 db_proxy.py 和相关模块存在于正确路径中: {e}")
-    # 在实际应用中，如果模块缺失，这里应该显示 messagebox 并退出
-    # messagebox.showerror("导入错误", f"请确保 db_proxy.py 和相关模块存在于正确路径中: {e}")
-    # sys.exit(1)
-
 
 # =====================================================
 # Dashboard View (内嵌式主面板) - 核心修改
@@ -88,7 +79,6 @@ class DashboardView(tk.Frame):
         ttk.Button(self.list_controls_frame, text="我填过的问卷",
                    command=lambda: self.switch_survey_list("filled")).pack(side=tk.LEFT, expand=True, padx=2)
 
-        # 【已修复 list_title 缺失】
         self.list_title = tk.Label(self.left_frame, text="问卷列表", font=("Arial", 12, "bold"), bg="#FAFAFA",
                                    anchor='w')
         self.list_title.pack(pady=(10, 0), fill=tk.X, padx=5)
@@ -128,12 +118,10 @@ class DashboardView(tk.Frame):
         self.create_right_panel_content()
 
         # 初始化加载数据 (默认加载我创建的)
-        # 【修改】首次加载也使用线程
         self.load_surveys(self.current_list_type)
 
     def create_right_panel_content(self):
         """创建右侧面板的所有子控件，并控制它们的显示/隐藏"""
-
         # ------------------- 1. 图表生成控件 (controls_frame) -------------------
         self.controls_frame = tk.Frame(self.right_frame, bg="white")
 
@@ -161,7 +149,6 @@ class DashboardView(tk.Frame):
 
         # ------------------- 3. 答案 Treeview (初始隐藏) -------------------
         self.answer_tree_frame = tk.Frame(self.content_display_container, bg="white")
-        # 不需要 pack，只在需要时显示
 
         self.tree_ans = ttk.Treeview(self.answer_tree_frame, columns=("Question", "Answer"), show='headings')
         self.tree_ans.heading("Question", text="题目")
@@ -208,7 +195,6 @@ class DashboardView(tk.Frame):
     def switch_survey_list(self, list_type: str):
         """切换显示 'mine' 或 'filled' 问卷列表"""
         self.current_list_type = list_type
-        # 【修改】调用线程加载
         self.load_surveys(list_type)
 
         # 初始状态：隐藏所有内容，仅显示默认提示
@@ -223,9 +209,7 @@ class DashboardView(tk.Frame):
         self.chart_image_ref = None
 
     def load_surveys(self, list_type: str):
-        """
-        【修改】启动线程来加载问卷列表，避免卡顿
-        """
+        """启动线程来加载问卷列表，避免卡顿"""
         self.current_list_type = list_type
 
         # 清空 Treeview
@@ -245,9 +229,7 @@ class DashboardView(tk.Frame):
         threading.Thread(target=self._load_surveys_thread, args=(list_type,)).start()
 
     def _load_surveys_thread(self, list_type: str):
-        """
-        [新增] 在后台线程中执行 I/O 阻塞操作（网络请求）
-        """
+        """在后台线程中执行 I/O 阻塞操作（网络请求）"""
         surveys: List[Dict[str, Any]] = []
         error_msg: Optional[str] = None
         try:
@@ -308,17 +290,13 @@ class DashboardView(tk.Frame):
             return
 
         try:
-            # 1. 发送网络请求 (注意：这会阻塞 UI 线程一小会儿，直到收到回复)
             res = db_proxy.update_survey_status(self.sock, survey_id, target_status)
 
             messagebox.showinfo("成功", f"问卷已{action_name}")
 
-            # 3. 【核心修复】立即触发刷新逻辑
-            # 因为 load_surveys 内部使用了线程，它会先显示“加载中”然后更新列表
             self.load_surveys("mine")
 
         except Exception as e:
-            # 如果发生 AttributeError (即你之前的错误) 或网络错误，会显示在这里
             messagebox.showerror("通讯错误", f"执行{action_name}时发生异常: {e}")
 
     def action_publish(self):
@@ -540,7 +518,6 @@ class DashboardView(tk.Frame):
         q_text = q_label
 
         # --- 核心逻辑判断：根据题干中的类型标识限制生成内容 ---
-        # 题干格式通常为 "1. 题目文本 [type]"
         is_text_type = "[text]" in q_label.lower() or "[textarea]" in q_label.lower()
 
         if is_text_type:
@@ -585,11 +562,7 @@ class DashboardView(tk.Frame):
         self.master.after(0, self._display_chart_ui_flexible, result, error_msg, title, q_text, c_type)
 
     def _display_chart_ui_flexible(self, result: Any, error_msg: Optional[str], title: str, q_text: str, c_type: str):
-        """
-        修正后的渲染函数：
-        1. 彻底清除之前的 image 引用
-        2. 根据 c_type 决定是更新 Label 的 text 还是 image
-        """
+
         if self.loading_chart_label:
             self.loading_chart_label.destroy()
 
@@ -598,12 +571,10 @@ class DashboardView(tk.Frame):
             self.chart_image_ref = None
             return
 
-        # 重要：每次更新前先重置 Label 状态，防止旧图片干扰
         self.chart_label.config(image="", text="")
 
         if c_type == "text_answer":
             # --- 情况 A: 处理文字报告 ---
-            # 此时 result 是后端传来的 bytes 或 str
             try:
                 report_content = result.decode('utf-8') if isinstance(result, bytes) else str(result)
             except Exception:
@@ -614,20 +585,17 @@ class DashboardView(tk.Frame):
             self.chart_label.config(
                 text=full_report,
                 fg="black",
-                font=("Consolas", 11),  # 等宽字体适合打印报告
+                font=("Consolas", 11),
                 justify=tk.LEFT,
-                anchor="nw",  # 文本从左上角开始排版
+                anchor="nw",
                 padx=20,
                 pady=20,
-                compound="none"  # 确保不尝试显示图片
+                compound="none"
             )
-            self.chart_image_ref = None  # 清空图片引用
+            self.chart_image_ref = None
 
         else:
             # --- 情况 B: 处理图像图表 ---
-            # 此时 result 必须是已经转换好的 PhotoImage 对象
-            # 如果 generate_chart_image 返回的是 bytes，这里需要先转 PhotoImage
-
             self.chart_image_ref = result  # 保持引用防止 GC
             self.chart_label.config(
                 image=result,
@@ -699,8 +667,6 @@ class UserSystemApp:
             messagebox.showerror("网络错误",
                                  f"无法连接服务器 {self.SERVER_HOST}:{self.SERVER_PORT}. 请确保服务器已运行。错误: {e}")
             return False
-
-    # user_system_tkinter.py 内部
 
     def _start_control_socket(self):
         """建立控制 socket，用于监听强制下线"""
@@ -811,11 +777,9 @@ class UserSystemApp:
             user = db_proxy.get_user_by_login(self.sock, name)
 
             if user:
-                # 假设服务器端处理了哈希，这里只需要比较
-                db_pwd = user.get('password')  # 假设返回的是哈希后的密码
+                db_pwd = user.get('password')
 
                 if db_pwd == pwd:
-                    # 检查用户状态（避免禁用用户登录）
                     if user.get('user_status') == 'banned':
                         messagebox.showerror("登录失败", "您的账户已被禁用，请联系管理员。")
                         return
@@ -834,7 +798,6 @@ class UserSystemApp:
                     except:
                         pass
 
-                   # ✅ 新增：启动 control socket
                     self._start_control_socket()
 
                     self.show_dashboard()
@@ -874,15 +837,12 @@ class UserSystemApp:
             return
 
         try:
-            # 1. 验证身份（注销前必须确保用户名和密码正确）
+            # 验证身份（注销前必须确保用户名和密码正确）
             user = db_proxy.get_user_by_login(self.sock, name)
 
             if user and user.get('password') == pwd:
                 user_id = user.get('user_id')
 
-                # 2. 调用 db_proxy 更新状态为 'stop'
-                # 注意：假设 db_proxy 有 update_user_status 或类似修改用户属性的方法
-                # 如果没有直接的 update_user_status，可能需要 db_proxy.update_user(...)
                 res = db_proxy.update_user_status(self.sock, user_id, 'stop')
 
                 # 根据 db_proxy 返回格式判断是否成功
