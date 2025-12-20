@@ -18,13 +18,9 @@ class AnswerViolationChecker:
         self.load_banned_words()
 
     def load_banned_words(self):
-        """
-        加载 python-project/module_a/banned_words.txt
-        """
-        # 获取当前文件 (fill_survey_gui.py) 所在目录
-        current_dir = os.path.dirname(os.path.abspath(__file__))
+        #加载 python-project/module_a/banned_words.txt
 
-        # module_a 在上一级目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
 
         file_path = os.path.join(project_root, "module_a", "banned_words.txt")
@@ -40,9 +36,7 @@ class AnswerViolationChecker:
             self.banned_words = ["暴力", "赌博", "诈骗"]
 
     def check_text(self, text: str):
-        """
-        检查单个文本是否包含敏感词
-        """
+        #检查单个文本是否包含敏感词
         if not text:
             return False, None
 
@@ -52,9 +46,7 @@ class AnswerViolationChecker:
         return False, None
 
 
-# ---------------------------
 # 输入用户名窗口（替代登录）
-# ---------------------------
 class UsernameWindow:
     def __init__(self, master):
         self.master = master
@@ -89,9 +81,7 @@ class UsernameWindow:
         MainWindow(self.master, user_id)
 
 
-# ---------------------------
 # 主窗口：问卷列表
-# ---------------------------
 class MainWindow:
     def __init__(self, master, user_id):
         self.master = master
@@ -133,9 +123,7 @@ class MainWindow:
         self.win.destroy()  # 关闭当前 MainWindow
         self.master.deiconify()  # 显示上一个窗口
 
-    # ------------------------------
     # 搜索区（新增）
-    # ------------------------------
     def create_search_bar(self):
         bar = tk.Frame(self.container, bg="#F0F2F5")
         bar.pack(fill="x", pady=10, padx=10)
@@ -174,9 +162,7 @@ class MainWindow:
         )
         reset_btn.pack(side="left", padx=6, ipadx=10)
 
-    # ------------------------------
     # 执行搜索
-    # ------------------------------
     def apply_filter(self):
         value = self.search_entry.get().strip()
         mode = self.search_mode.get()
@@ -199,18 +185,14 @@ class MainWindow:
 
         self.refresh()
 
-    # ------------------------------
     # 清除过滤
-    # ------------------------------
     def reset_filter(self):
         self.filter_type = None
         self.filter_value = None
         self.search_entry.delete(0, tk.END)
         self.refresh()
 
-    # ------------------------------
-    # 刷新问卷列表（已修改）
-    # ------------------------------
+    # 刷新问卷列表
     def refresh(self):
         # 清空旧内容（保留搜索栏）
         for widget in self.container.winfo_children()[1:]:
@@ -285,9 +267,7 @@ class MainWindow:
         FillSurveyWindow(main_window=self, parent_win=self.win,
                          user_id=self.user_id, survey_id=survey_id)
 
-# ---------------------------
 # 问卷填写窗口
-# ---------------------------
 class FillSurveyWindow:
     def __init__(self, main_window, parent_win, user_id, survey_id):
 
@@ -404,7 +384,7 @@ class FillSurveyWindow:
         self.win.destroy()
 
     def submit_answers(self):
-        # ========= 必填校验 ==========
+        #必填校验
         for q in self.survey_data["questions"]:
             qid = q["question_id"]
             widget = self.answer_widgets[qid]
@@ -428,7 +408,7 @@ class FillSurveyWindow:
                     messagebox.showwarning("未完成", f"第 {q['index']} 题尚未填写（文本题）。")
                     return
 
-        # ========= 新增：答案敏感词检查 ==========
+        # 新增：答案敏感词检查
         for q in self.survey_data["questions"]:
             qid = q["question_id"]
             widget = self.answer_widgets[qid]
@@ -452,7 +432,7 @@ class FillSurveyWindow:
                 return
 
 
-        # ========= 校验通过后才允许提交 ==========
+        #校验通过后才允许提交
         db.add_answer_survey_history(self.user_id, self.survey_id)
 
         for q in self.survey_data["questions"]:
@@ -472,14 +452,12 @@ class FillSurveyWindow:
 
         messagebox.showinfo("成功", "问卷填写完成！")
 
-        self.main_window.refresh()  # ← 刷新问卷列表
+        self.main_window.refresh()  # 刷新问卷列表
 
         self.parent_win.deiconify()
         self.win.destroy()
 
-# ---------------------------
 # 程序入口
-# ---------------------------
 if __name__ == "__main__":
     root = tk.Tk()  # 只创建一个 Tk 实例
     UsernameWindow(root)

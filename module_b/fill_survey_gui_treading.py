@@ -7,21 +7,18 @@ import sys
 import os
 from typing import List, Dict, Any, Optional
 
-# 让程序能找到根目录的 db_proxy.py
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import db_proxy as db
 
 
-# ======== 违规词检查（使用 module_a/banned_words.txt） ========
+# 违规词检查
 class AnswerViolationChecker:
     def __init__(self):
         self.banned_words = []
         self.load_banned_words()
 
     def load_banned_words(self):
-        """
-        加载 python-project/module_a/banned_words.txt
-        """
+        #加载 python-project/module_a/banned_words.txt
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
         file_path = os.path.join(project_root, "module_a", "banned_words.txt")
@@ -37,9 +34,7 @@ class AnswerViolationChecker:
             self.banned_words = ["暴力", "赌博", "诈骗"]
 
     def check_text(self, text: str):
-        """
-        检查单个文本是否包含敏感词
-        """
+       # 检查单个文本是否包含敏感词
         if not text:
             return False, None
 
@@ -49,9 +44,7 @@ class AnswerViolationChecker:
         return False, None
 
 
-# ---------------------------
-# 输入用户名窗口（保持不变）
-# ---------------------------
+# 输入用户名窗口
 class UsernameWindow:
     def __init__(self, master):
         self.master = master
@@ -168,9 +161,7 @@ class UsernameWindow:
         MainWindow(self.master, user_id, sock)
 
 
-# ---------------------------
 # 主窗口：问卷列表
-# ---------------------------
 class MainWindow:
     def __init__(self, master, user_id, sock):
         self.master = master
@@ -227,9 +218,9 @@ class MainWindow:
         self.filled_surveys = set()
         self.search_bar_frame = None  # 存储搜索栏的引用
 
-        # 1. 创建搜索栏 (必须在 refresh 之前创建)
+        #  创建搜索栏 ，refresh之前
         self.create_search_bar()
-        # 2. 加载问卷列表
+        #加载问卷列表
         self.refresh()
 
         self.back_btn = ttk.Button(
@@ -271,7 +262,7 @@ class MainWindow:
             self.loading_overlay.destroy()
             self.loading_overlay = None
 
-    # 🚀 新增：判断是否为网络错误
+    # 判断是否为网络错误
     def is_network_error(self, message: str) -> bool:
         """检查错误信息是否包含瞬时网络错误关键词"""
         return "网络超时" in message or "网络错误" in message or "连接已关闭" in message or "接收服务器响应超时" in message
@@ -283,7 +274,7 @@ class MainWindow:
     def refresh(self):
         # 清除旧的列表项
         for widget in self.container.winfo_children():
-            # ⚠️ 关键修复：判断是否是搜索栏，如果是则保留
+            # 判断是否是搜索栏，如果是则保留
             if widget is not self.search_bar_frame:
                 widget.destroy()
 
@@ -301,7 +292,7 @@ class MainWindow:
             # 1. 获取所有公开问卷
             all_surveys = db.get_public_surveys(self.sock)
 
-            # 2. 过滤逻辑（与原来一致）
+            # 2. 过滤逻辑
             surveys = []
             if self.filter_type is None:
                 surveys = all_surveys
@@ -321,23 +312,21 @@ class MainWindow:
                     except:
                         surveys = []
 
-            # 3. 获取用户已填写的问卷ID
+            # 获取用户已填写的问卷ID
             filled_surveys = db.get_surveys_filled_by_user(self.sock, self.user_id)
 
-            # 4. 返回主线程，一次性绘制
+            # 返回主线程，一次性绘制
             self.win.after(0, self._update_gui_with_data, surveys, filled_surveys)
 
         except Exception as e:
             error_message = f"刷新列表失败: {e}"
             if self.is_network_error(error_message):
-                # 🚀 自动刷新，不弹窗，重新尝试加载
+                # 自动刷新，不弹窗，重新尝试加载
                 self.win.after(0, self.refresh)
             else:
                 self.win.after(0, self._handle_error, error_message)
 
-    # =======================================================
     # 一次性绘制所有问卷列表
-    # =======================================================
     def _update_gui_with_data(self, surveys, filled_surveys):
         try:
             for survey in surveys:
@@ -367,7 +356,6 @@ class MainWindow:
         # 确保新创建的按钮排在搜索栏和标签之后
         btn.pack(pady=5, fill="x", padx=20)
 
-    # =======================================================
 
     def back_to_previous(self):
         self.win.destroy()
@@ -502,7 +490,7 @@ class FillSurveyWindow:
         except Exception as e:
             error_message = f"获取问卷详情失败: {e}"
             if self.is_network_error(error_message):
-                # 🚀 网络错误，自动返回并刷新主列表
+                # 网络错误，自动返回并刷新主列表
                 self.win.after(0, self._handle_loading_network_failure)
             else:
                 # 其他错误（如问卷不存在），弹窗并返回主列表
@@ -635,7 +623,7 @@ class FillSurveyWindow:
         self.parent_win.deiconify()
 
     def submit_answers(self):
-        # 1. 前端校验
+        # 前端校验
         for q in self.survey_data["questions"]:
             qid = q["question_id"]
             widget = self.answer_widgets[qid]
@@ -667,17 +655,17 @@ class FillSurveyWindow:
                                      parent=self.win)
                 return
 
-        # 2. 禁用按钮，显示加载状态
+        # 禁用按钮，显示加载状态
         self.submit_btn.config(state="disabled")
         self.back_btn.config(state="disabled")
         self.show_loading_state("正在提交答案...")
 
-        # 3. 提交操作在工作线程中进行
+        # 提交操作在工作线程中进行
         threading.Thread(target=self._submit_answers_in_thread, daemon=True).start()
 
     def _submit_answers_in_thread(self):
         try:
-            # 1. 整理答案
+            # 整理答案
             answers_to_submit = []
             for q in self.survey_data["questions"]:
                 qid = q["question_id"]
@@ -695,7 +683,7 @@ class FillSurveyWindow:
                 # 整理成新接口需要的格式
                 answers_to_submit.append({'question_id': qid, 'answer_text': ans})
 
-            # 2. 关键优化：只调用一次合并的提交接口
+            # 关键优化：只调用一次合并的提交接口
             db.add_full_survey_submission(
                 self.sock,
                 self.user_id,
@@ -703,14 +691,14 @@ class FillSurveyWindow:
                 answers_to_submit  # 包含所有问题的列表
             )
 
-            # 3. 成功后返回主线程处理 UI
+            # 成功后返回主线程处理 UI
             self.win.after(0, self._submission_success)
 
 
         except Exception as e:
             error_message = str(e)
             cleanup_successful = False
-            # 🌟 核心改动 1：主动检查数据库是否已成功写入
+            # 主动检查数据库是否已成功写入
             try:
                 filled = db.get_surveys_filled_by_user(self.sock, self.user_id)
                 if self.survey_id in filled:
@@ -719,7 +707,7 @@ class FillSurveyWindow:
                     return
             except:
                 pass
-            # 🌟 核心改动 2：仍然作为网络错误处理，但不再误报数据未写入
+            # 仍然作为网络错误处理，但不再误报数据未写入
             if self.is_network_error(error_message):
                 try:
                     db.undo_survey_submission(self.sock, self.user_id, self.survey_id, timeout=5.0)
@@ -746,11 +734,11 @@ class FillSurveyWindow:
 
         if self.is_network_error(message):
             if cleanup_successful:
-                # 🚀 已经成功清除，用户可以重新填写
+                # 经成功清除，用户可以重新填写
                 messagebox.showinfo("提交失败", "网络连接超时，已**成功清除**本次作答记录，请检查网络后重试。",
                                     parent=self.win)
             else:
-                # 🚀 清除失败，数据可能已存入，提示用户刷新主页查看
+                # 清除失败，数据可能已存入，提示用户刷新主页查看
                 messagebox.showinfo("提交失败",
                                     "网络连接不稳定，请稍后点击'提交问卷'按钮重试。（注意：由于网络原因，本次作答记录可能已部分存入，建议返回主页刷新查看问卷是否标记为'已填写'）",
                                     parent=self.win)

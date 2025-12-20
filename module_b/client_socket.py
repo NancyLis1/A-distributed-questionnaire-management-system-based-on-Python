@@ -30,10 +30,7 @@ class ClientContext:
 
 client_ctx = ClientContext()
 
-
-# ==========================
 # Control Socket（只监听）
-# ==========================
 def start_control_listener(user_id: int, on_kicked):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((SERVER_HOST, SERVER_PORT))
@@ -62,10 +59,7 @@ def start_control_listener(user_id: int, on_kicked):
 
     threading.Thread(target=listen, daemon=True).start()
 
-
-# ==========================
 # Business Request
-# ==========================
 def send_request(action: str, params: Optional[dict] = None, sock: Optional[socket.socket] = None,
                  timeout: float = 5.0) -> Any:
     if client_ctx.kicked:
@@ -77,7 +71,7 @@ def send_request(action: str, params: Optional[dict] = None, sock: Optional[sock
     request = {"action": action, "params": params or {}}
 
     try:
-        # 发送请求时增加换行符，方便服务端处理（可选，但建议）
+        # 发送请求时增加换行符，方便服务端处理
         msg = json.dumps(request).encode("utf-8")
         sock.sendall(msg)
 

@@ -56,7 +56,7 @@ def handle_client(conn, addr):
                     if user_id not in active_users:
                         active_users[user_id] = {}
 
-                    # 如果已有旧登录 → 强制下线
+                    # 如果已有旧登录， 强制下线
                     old_control = active_users[user_id].get("control")
                     old_business = active_users[user_id].get("business")
 
