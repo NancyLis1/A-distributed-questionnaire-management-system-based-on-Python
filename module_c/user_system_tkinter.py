@@ -287,46 +287,39 @@ class DashboardView(tk.Frame):
 
     def _update_survey_status(self, target_status, allowed_statuses, action_name):
         """
-        核心逻辑：对应你报错中缺失的那个方法名
+        统一处理问卷状态变更，并确保界面立即刷新
         """
         selected = self.tree.selection()
         if not selected:
             return
 
         item = self.tree.item(selected[0])
-        # values 顺序: (ID, 标题, 状态, 创建者)
-        survey_id = item['values'][0]
-        current_status = item['values'][2]
-
-        # 状态检查
-        if current_status not in allowed_statuses:
-            messagebox.showwarning("提示", f"当前状态为 '{current_status}'，无法执行 '{action_name}' 操作。")
+        try:
+            survey_id = int(item['values'][0])
+            current_status = item['values'][2]
+        except (IndexError, ValueError):
             return
 
-        if messagebox.askyesno("确认", f"确定要{action_name}问卷 ID:{survey_id} 吗？"):
-            try:
-                # 调用 db_proxy 接口
-                res = db_proxy.update_survey_status(self.sock, int(survey_id), target_status)
+        if current_status not in allowed_statuses:
+            messagebox.showwarning("操作受限", f"当前状态为 '{current_status}'，无法执行 '{action_name}'。")
+            return
 
-                # 调试打印：如果你想看 result 到底是什么，取消下面这行的注释
-                # print(f"DEBUG: Server returned: {res}")
+        if not messagebox.askyesno("确认操作", f"确定要 {action_name} 问卷 (ID: {survey_id}) 吗？"):
+            return
 
-                # 判断逻辑：兼容布尔值和字典返回
-                is_success = False
-                if isinstance(res, bool):
-                    is_success = res
-                elif isinstance(res, dict):
-                    is_success = (res.get("status") == "success" or res.get("success") is True)
-                elif res is not None:
-                    is_success = True
+        try:
+            # 1. 发送网络请求 (注意：这会阻塞 UI 线程一小会儿，直到收到回复)
+            res = db_proxy.update_survey_status(self.sock, survey_id, target_status)
 
-                if is_success:
-                    messagebox.showinfo("成功", f"问卷已成功执行: {action_name}")
-                    self.load_surveys("mine")  # 刷新列表
-                else:
-                    messagebox.showerror("失败", "服务器处理请求失败。")
-            except Exception as e:
-                messagebox.showerror("系统错误", f"通讯异常: {e}")
+            messagebox.showinfo("成功", f"问卷已{action_name}")
+
+            # 3. 【核心修复】立即触发刷新逻辑
+            # 因为 load_surveys 内部使用了线程，它会先显示“加载中”然后更新列表
+            self.load_surveys("mine")
+
+        except Exception as e:
+            # 如果发生 AttributeError (即你之前的错误) 或网络错误，会显示在这里
+            messagebox.showerror("通讯错误", f"执行{action_name}时发生异常: {e}")
 
     def action_publish(self):
         """发布：draft -> active"""
