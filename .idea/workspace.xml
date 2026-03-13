@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d3827cc6-4931-4f7e-be70-0c7b93f03036" name="更改" comment="改注释">
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/python-project.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="360RnpGYUE4Blehz78DsbHRjOKC" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python 测试.Python 测试 (test_answer_submit.py 内).executor": "Run",
+    "Python 测试.Python 测试 (test_main.py 内).executor": "Run",
+    "Python.login_re.executor": "Run",
+    "Python.main.executor": "Run",
+    "Python.reset_db.executor": "Run",
+    "Python.ui_editor.executor": "Run",
+    "Python.user_system_tkinter.executor": "Run",
+    "Python.verify_latest_active.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "D:/2025down/实习/新建文件夹/广东竞赛",
+    "settings.editor.selected.configurable": "preferences.lookFeel"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\2025down\CPython\python-project\tests" />
+      <recent name="D:\2025down\CPython\python-project\tests\tests_a" />
+      <recent name="D:\2025down\CPython\python-project\database" />
+      <recent name="D:\2025down\CPython\python-project\module_b" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-0e3be3396995-c546a90a8094-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-242.23339.19" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="d3827cc6-4931-4f7e-be70-0c7b93f03036" name="更改" comment="" />
+      <created>1764141672088</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1764141672088</updated>
+    </task>
+    <task id="LOCAL-00001" summary="修改了项目目录，这样比较清晰">
+      <option name="closed" value="true" />
+      <created>1764910904604</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1764910904604</updated>
+    </task>
+    <task id="LOCAL-00002" summary="1. 在 Survey 表中添加 survey_title 字段（问卷标题）&#10;&#10;2. 新增 Option 表，用于存储选择题的选项。&#10;&#10;3. 新增 Violation 表，用于管理违规问卷。">
+      <option name="closed" value="true" />
+      <created>1764918879307</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1764918879307</updated>
+    </task>
+    <task id="LOCAL-00003" summary="一共修改并增添两个文件：&#10;1.create_sql_database.py：给用户表增添了password；&#10;2.db_utils：&#10;1）问卷表 add_survey（已修改）：适应新增的 survey_title 字段）；&#10;2）新增选项表（add_option);&#10;3）新增函数 get_full_survey_detail: 该函数实现了实现了供 B 模块使用的核心数据读取接口。成员B可通过该函数获得接口访问权限，根据 survey_id 获得一个完整的 Python 字典，内含问卷所有信息。可将字典序列化成 JSON 字符串，通过网络发送给客户端（填写界面）。&#10;3.备注：test_collaboration.py为用于测试get_full_survey_detail函数的示例，不是正式的代码文件">
+      <option name="closed" value="true" />
+      <created>1764924714540</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1764924714540</updated>
+    </task>
+    <task id="LOCAL-00004" summary="1.修改1个文件：db_utils.py：&#10;1）新增 get_public_surveys 函数，获取所有已发布（active）状态的问卷列表，共用户选择填写。&#10;2）修改 add_answer 中，问卷是否存在的逻辑，增强健壮性并与 add_answer_survey_history 保持一致性；&#10;3）修改 public_survey函数: 不再完全依赖 execute ，而是自己管理连接和提交，这样能确保 commit (即更新生效）&#10;4）修改 get_survey 函数，从索引访问修改成列名访问，避免出错。&#10;2.新增三个文件：&#10;1）reset_db.py：它是一个重置数据库的脚本，可以清除所有的测试数据，并将数据库初始化；&#10;2）test_survey_list.py：它是一个测试脚本，用于验证 get_public_surveys 只返回已发布的问卷。&#10;3）test_answer_submit.py：用于验证答案提交接口能正确地将答案写入数据库。">
+      <option name="closed" value="true" />
+      <created>1764932769847</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1764932769847</updated>
+    </task>
+    <task id="LOCAL-00005" summary="数据库文件">
+      <option name="closed" value="true" />
+      <created>1764934473170</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1764934473170</updated>
+    </task>
+    <task id="LOCAL-00006" summary="更新内容如下：&#10;1.新增部分（db_utils.py)：完善了CRUD中的UD部分。&#10;1）Update：&#10;update_survey_status 用于更新问卷状态；&#10;update_survey_title 用于修改问卷标题；&#10;update_question_text 用于修改问题题干；&#10;update_option_text 用于修改选项文字。&#10;2）Delete：&#10;delete_survey 用于物理删除问卷；&#10;delete_question 用于删除单个问题；&#10;delete_option 用于删除单个选项。&#10;2. 调整部分（db utils.py）：依次按CRUD的顺序调整了db utils.py的代码结构，依次为，&#10;1）CRUD实现1：Create（创建）—— 以add开头的函数；&#10;2）CRUD实现2：Read（读取）—— 以get开头的函数；&#10;3）RUD实现：Update (更新) &amp; Delete (删除) —— 分别以update和delete开头的函数。&#10;3. 测试文件（tests/test_crud_complete.py）：测试成功属于UD板块的所有内容。">
+      <option name="closed" value="true" />
+      <created>1765082692391</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1765082692391</updated>
+    </task>
+    <task id="LOCAL-00007" summary="更新内容如下：&#10;1.新增部分（db_utils.py)：完善了有关violation的部分，新增函数如下：&#10;1）add_violation：违规管理 - 写入接口 (供 Manager 使用)；&#10;2）get_all_violations：违规管理 - 查询接口 (供 管理员界面/C模块 使用)，获取详细的违规列表，同时返回 survey_id, user_id (发布者), reason, time等。&#10;2.新增部分（module_a/violation_checker.py）：&#10;1）这个模块负责判断一段文本是否包含我们定义的“敏感词”；&#10;2）敏感词词库为：module_a/banned_words.txt（手动编写的内容，有一些基本关于色情、非法、暴力的内容）。&#10;3.新增部分（module_a/survey_manager.py）：&#10;调用 db_utils 和 violation_checker，把复杂的逻辑（如复制问卷）封装成简单的函数供 GUI 调用。&#10;3.测试部分（都已测试成功）：&#10;1）tests/test_a_business_logic.py：&#10;用于验证验证“违规检测”和“复制功能”是否好用；&#10;启动命令：python tests/test_a_business_logic.py&#10;2）tests/test_a_violation_details.py：&#10;用于查看管理员从 get_all_violations() 取出来的数据是否真的包含了指定的核心要素；&#10;启动命令：python tests/test_a_violation_details.py">
+      <option name="closed" value="true" />
+      <created>1765098476203</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1765098476203</updated>
+    </task>
+    <task id="LOCAL-00008" summary="更新以下内容：&#10;增添部分：&#10;1.main.py：创建唯一的根窗口root = tk.Tk()，然后暂时模拟当前登录用户 (实际应从登录界面传过来)；&#10;2.ui_dashboard.py：是我们的主面板，我现在只放了一个按钮在最下方，就是创建问卷，后续可增添其他功能；&#10;3.module_a/ui_editor.py：这个是创建问卷的界面，暂时实现了一些基本的功能，点击该界面的“完成编辑”按钮，会把该问卷数据写入数据库。（点击后，该问卷状态为“Draft”，需要用户手动发布——这个具体形式还没想好）&#10;测试部分：&#10;4.tests/verify_latest.py：检测是否有把ui_editor.py创建的问卷成功写入数据库，已测试成功。">
+      <option name="closed" value="true" />
+      <created>1765169800177</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1765169800177</updated>
+    </task>
+    <task id="LOCAL-00009" summary="更新一点错误">
+      <option name="closed" value="true" />
+      <created>1765170107212</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1765170107212</updated>
+    </task>
+    <task id="LOCAL-00010" summary="更新以下内容：&#10;1.db_utils.py：“防重复填写”的辅助函数 has_user_answered_survey：B 在允许用户开始填写前，调用这个函数。如果返回 True，B 的服务器可以直接告诉客户端：“你已经填过这份问卷了，不可重复填写。”">
+      <option name="closed" value="true" />
+      <created>1765250806971</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1765250806971</updated>
+    </task>
+    <task id="LOCAL-00011" summary="更新modular_a/ui_editor：&#10;1.丰富了更多的功能；&#10;2.已经完善点击“完成编辑”后的发布逻辑和点击小房子之后返回主页的存草稿的逻辑。">
+      <option name="closed" value="true" />
+      <created>1765343583261</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1765343583261</updated>
+    </task>
+    <task id="LOCAL-00012" summary="修改标签slider">
+      <option name="closed" value="true" />
+      <created>1765350984742</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1765350984742</updated>
+    </task>
+    <task id="LOCAL-00013" summary="slider">
+      <option name="closed" value="true" />
+      <created>1765351134124</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1765351134124</updated>
+    </task>
+    <task id="LOCAL-00014" summary="更新以下内容：&#10;1.完成slider（滑动条）的逻辑；&#10;2.已修改全部 ui_editor.py 不让GUI直接接触数据库；&#10;3.对应上述部分的功能，在db_utils.py中新增两个函数，并且在db_proxy.py中对应增加。">
+      <option name="closed" value="true" />
+      <created>1765363945625</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1765363945625</updated>
+    </task>
+    <task id="LOCAL-00015" summary="1.已经新增创建问卷GUI的网络版本（ui_editor_treading.py): 切断 GUI 对数据库的直接访问，全部改为通过 db_proxy 利用 socket 发送请求给服务器。&#10;2将ui_dashboard.py 中的 from module_a.ui_editor、 import SurveyEditorWindow 改为 from module_a.ui_editor_treading import SurveyEditorWindow ( 网络版本）">
+      <option name="closed" value="true" />
+      <created>1765365861620</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1765365861620</updated>
+    </task>
+    <task id="LOCAL-00016" summary="更新以下内容：&#10;1.client_socket.py：将简单的 recv 改为循环接收，直到拼凑出一个完整的 JSON 数据包，解决 Expecting value 这种数据截断错误。&#10;2.在db.utils.py和db.proxy.py：添加add_question_with_options函数，实现“一次请求添加题目和选项”&#10;3.优化ui_editor_treading.py：基本上不会特别卡了，但是不能高强度点击添加题目，就是连续非常快地点。基本上点一个添加题目等2s，再点添加下一个题目就不会卡顿。（还在优化中）">
+      <option name="closed" value="true" />
+      <created>1765535574386</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1765535574386</updated>
+    </task>
+    <task id="LOCAL-00017" summary="恢复">
+      <option name="closed" value="true" />
+      <created>1765537557442</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1765537557442</updated>
+    </task>
+    <task id="LOCAL-00018" summary="恢复">
+      <option name="closed" value="true" />
+      <created>1765544791615</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1765544791615</updated>
+    </task>
+    <task id="LOCAL-00019" summary="优化创建问卷的界面，现在基本上不会卡了，并且增加了刷新、回滚和防抖的机制。">
+      <option name="closed" value="true" />
+      <created>1765612643038</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1765612643038</updated>
+    </task>
+    <task id="LOCAL-00020" summary="改注释">
+      <option name="closed" value="true" />
+      <created>1766229995955</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1766229995955</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="修改了项目目录，这样比较清晰" />
+    <MESSAGE value="1. 在 Survey 表中添加 survey_title 字段（问卷标题）&#10;&#10;2. 新增 Option 表，用于存储选择题的选项。&#10;&#10;3. 新增 Violation 表，用于管理违规问卷。" />
+    <MESSAGE value="一共修改并增添两个文件：&#10;1.create_sql_database.py：给用户表增添了password；&#10;2.db_utils：&#10;1）问卷表 add_survey（已修改）：适应新增的 survey_title 字段）；&#10;2）新增选项表（add_option);&#10;3）新增函数 get_full_survey_detail: 该函数实现了实现了供 B 模块使用的核心数据读取接口。成员B可通过该函数获得接口访问权限，根据 survey_id 获得一个完整的 Python 字典，内含问卷所有信息。可将字典序列化成 JSON 字符串，通过网络发送给客户端（填写界面）。&#10;3.备注：test_collaboration.py为用于测试get_full_survey_detail函数的示例，不是正式的代码文件" />
+    <MESSAGE value="1.修改1个文件：db_utils.py：&#10;1）新增 get_public_surveys 函数，获取所有已发布（active）状态的问卷列表，共用户选择填写。&#10;2）修改 add_answer 中，问卷是否存在的逻辑，增强健壮性并与 add_answer_survey_history 保持一致性；&#10;3）修改 public_survey函数: 不再完全依赖 execute ，而是自己管理连接和提交，这样能确保 commit (即更新生效）&#10;4）修改 get_survey 函数，从索引访问修改成列名访问，避免出错。&#10;2.新增三个文件：&#10;1）reset_db.py：它是一个重置数据库的脚本，可以清除所有的测试数据，并将数据库初始化；&#10;2）test_survey_list.py：它是一个测试脚本，用于验证 get_public_surveys 只返回已发布的问卷。&#10;3）test_answer_submit.py：用于验证答案提交接口能正确地将答案写入数据库。" />
+    <MESSAGE value="数据库文件" />
+    <MESSAGE value="更新内容如下：&#10;1.新增部分（db_utils.py)：完善了CRUD中的UD部分。&#10;1）Update：&#10;update_survey_status 用于更新问卷状态；&#10;update_survey_title 用于修改问卷标题；&#10;update_question_text 用于修改问题题干；&#10;update_option_text 用于修改选项文字。&#10;2）Delete：&#10;delete_survey 用于物理删除问卷；&#10;delete_question 用于删除单个问题；&#10;delete_option 用于删除单个选项。&#10;2. 调整部分（db utils.py）：依次按CRUD的顺序调整了db utils.py的代码结构，依次为，&#10;1）CRUD实现1：Create（创建）—— 以add开头的函数；&#10;2）CRUD实现2：Read（读取）—— 以get开头的函数；&#10;3）RUD实现：Update (更新) &amp; Delete (删除) —— 分别以update和delete开头的函数。&#10;3. 测试文件（tests/test_crud_complete.py）：测试成功属于UD板块的所有内容。" />
+    <MESSAGE value="更新内容如下：&#10;1.新增部分（db_utils.py)：完善了有关violation的部分，新增函数如下：&#10;1）add_violation：违规管理 - 写入接口 (供 Manager 使用)；&#10;2）get_all_violations：违规管理 - 查询接口 (供 管理员界面/C模块 使用)，获取详细的违规列表，同时返回 survey_id, user_id (发布者), reason, time等。&#10;2.新增部分（module_a/violation_checker.py）：&#10;1）这个模块负责判断一段文本是否包含我们定义的“敏感词”；&#10;2）敏感词词库为：module_a/banned_words.txt（手动编写的内容，有一些基本关于色情、非法、暴力的内容）。&#10;3.新增部分（module_a/survey_manager.py）：&#10;调用 db_utils 和 violation_checker，把复杂的逻辑（如复制问卷）封装成简单的函数供 GUI 调用。&#10;3.测试部分（都已测试成功）：&#10;1）tests/test_a_business_logic.py：&#10;用于验证验证“违规检测”和“复制功能”是否好用；&#10;启动命令：python tests/test_a_business_logic.py&#10;2）tests/test_a_violation_details.py：&#10;用于查看管理员从 get_all_violations() 取出来的数据是否真的包含了指定的核心要素；&#10;启动命令：python tests/test_a_violation_details.py" />
+    <MESSAGE value="更新以下内容：&#10;增添部分：&#10;1.main.py：创建唯一的根窗口root = tk.Tk()，然后暂时模拟当前登录用户 (实际应从登录界面传过来)；&#10;2.ui_dashboard.py：是我们的主面板，我现在只放了一个按钮在最下方，就是创建问卷，后续可增添其他功能；&#10;3.module_a/ui_editor.py：这个是创建问卷的界面，暂时实现了一些基本的功能，点击该界面的“完成编辑”按钮，会把该问卷数据写入数据库。（点击后，该问卷状态为“Draft”，需要用户手动发布——这个具体形式还没想好）&#10;测试部分：&#10;4.tests/verify_latest.py：检测是否有把ui_editor.py创建的问卷成功写入数据库，已测试成功。" />
+    <MESSAGE value="更新一点错误" />
+    <MESSAGE value="更新以下内容：&#10;1.db_utils.py：“防重复填写”的辅助函数 has_user_answered_survey：B 在允许用户开始填写前，调用这个函数。如果返回 True，B 的服务器可以直接告诉客户端：“你已经填过这份问卷了，不可重复填写。”" />
+    <MESSAGE value="更新modular_a/ui_editor：&#10;1.丰富了更多的功能；&#10;2.已经完善点击“完成编辑”后的发布逻辑和点击小房子之后返回主页的存草稿的逻辑。" />
+    <MESSAGE value="修改标签slider" />
+    <MESSAGE value="slider" />
+    <MESSAGE value="更新以下内容：&#10;1.完成slider（滑动条）的逻辑；&#10;2.已修改全部 ui_editor.py 不让GUI直接接触数据库；&#10;3.对应上述部分的功能，在db_utils.py中新增两个函数，并且在db_proxy.py中对应增加。" />
+    <MESSAGE value="1.已经新增创建问卷GUI的网络版本（ui_editor_treading.py): 切断 GUI 对数据库的直接访问，全部改为通过 db_proxy 利用 socket 发送请求给服务器。&#10;2将ui_dashboard.py 中的 from module_a.ui_editor、 import SurveyEditorWindow 改为 from module_a.ui_editor_treading import SurveyEditorWindow ( 网络版本）" />
+    <MESSAGE value="更新以下内容：&#10;1.client_socket.py：将简单的 recv 改为循环接收，直到拼凑出一个完整的 JSON 数据包，解决 Expecting value 这种数据截断错误。&#10;2.在db.utils.py和db.proxy.py：添加add_question_with_options函数，实现“一次请求添加题目和选项”&#10;3.优化ui_editor_treading.py：基本上不会特别卡了，但是不能高强度点击添加题目，就是连续非常快地点。基本上点一个添加题目等2s，再点添加下一个题目就不会卡顿。（还在优化中）" />
+    <MESSAGE value="恢复" />
+    <MESSAGE value="优化创建问卷的界面，现在基本上不会卡了，并且增加了刷新、回滚和防抖的机制。" />
+    <MESSAGE value="改注释" />
+    <option name="LAST_COMMIT_MESSAGE" value="改注释" />
+  </component>
+</project>
