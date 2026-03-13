@@ -1,3 +1,4 @@
+HEAD
 # 问卷系统项目 README
 
 
@@ -104,3 +105,7 @@
 | 程序打包       | 全模块                       | 全体     |
 | 差异化功能     | 爬虫/模板问卷/趋势图         | 可选     |
 
+
+# A-distributed-questionnaire-management-system-based-on-Python
+PySurvey, a C/S-based questionnaire management system, supports multi-user simultaneous online access. It enables socket connections, questionnaire creation/filling, record query, data visualization, and digitalizes full-life-cycle questionnaire management.
+85fd9abaab00c58e8a35eb7b4dbbe5b9e93d546e
